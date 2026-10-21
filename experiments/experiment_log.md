@@ -1,0 +1,108 @@
+# Experiment log
+
+This log is updated only with commands actually executed and their observed results. A configuration file or passing unit test does not count as a benchmark result.
+
+## Initial environment audit
+
+- Date: 2026-10-14 (client time).
+- Workspace audit: no repository files or Git metadata were present.
+- Python: 3.12.14 from the desktop-bundled runtime.
+- WSL: `wsl.exe --status` and `wsl.exe --list --quiet` returned `Wsl/E_ACCESSDENIED`.
+- Compiler discovery: no system `gcc`, `clang`, MSVC, or Ghidra found on PATH/common locations.
+- Initial angr dependency installation: failed when pip unpacked source-only `mulpyplexer` under the sandbox temp path (Windows access denied).
+- Initial direct source download attempt for arpy/mulpyplexer: pip unpacking source metadata failed on the sandbox temp path; therefore the full angr import is not assumed available.
+- Both source-only dependencies were then loaded from PyPI archives after their archive SHA-256 hashes matched PyPI's JSON metadata. angr 10.0.4 and Claripy 9.3.7 imported successfully.
+- `ziglang==0.16.0` and `ziglang==0.15.2` both returned their version strings, but each compiler `env`/`cc` command returned `error: unable to find zig self exe path: Unexpected`.
+- A PyPI `tinycc==1.1` source archive was hash-checked; its bundled TinyCC 0.9.26 executable failed to start with Windows `Illegal System DLL Relocation`. It was not used to compile a fixture.
+
+## Executed implementation checks
+
+1. **Python syntax:**
+
+   ```powershell
+   & 'C:\Users\REDA NADIR\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -m compileall -q outputs\vulngenome\src outputs\vulngenome\tests outputs\vulngenome\scripts
+   ```
+
+   Observed exit code 0.
+
+2. **Unit tests and binary integration test:**
+
+   ```powershell
+   $env:PYTHONPATH='work\zig015;work\python-deps;outputs\vulngenome\src'
+   $env:TEMP='C:\Users\REDA NADIR\Documents\Codex\2026-10-14\files-pasted-by-the-user-mission\work'
+   & 'C:\Users\REDA NADIR\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -m pytest -q -p no:cacheprovider --basetemp=work\pytest-final outputs\vulngenome\tests
+   ```
+
+   Observed: **20 passed, 1 skipped**, exit code 0. The integration test skipped because Zig returned `unable to find zig self exe path: Unexpected`; no controlled C binaries were produced.
+
+3. **Real existing-binary analysis probe:** `analyze_binary(r'C:\Windows\System32\where.exe')` completed with angr 10.0.4. It recorded SHA-256 `f51fab8041e5023d7290b540a2106f051ef0bd2bc3443c9daf318628b560fa29`, PE32+, x86-64, CFG=true, VEX=true, 215 recovered functions, and no analysis errors. angr logged that optional `unicornlib.dll` support was disabled. This system executable is an environment probe only and is excluded from any vulnerability dataset.
+
+   Raw binary-analysis output: `experiments/results/environment-probe-where.json` (5,075,007 bytes).
+
+4. **Z3 CLI smoke query:** the bundled Python executable ran `-m vulngenome.cli verify outputs/vulngenome/fixtures/smt_smoke.spec.json outputs/vulngenome/fixtures/smt_smoke.evidence.json --out outputs/vulngenome/experiments/results/solver-smoke.json`. It returned `POTENTIAL_VIOLATION` / `sat` for the synthetic 8-bit values offset=255, length=1, capacity=0. The query zero-extends all operands to 9 bits, so the carry is retained. This is a solver/DSL smoke test, not a binary-analysis result.
+
+5. **Dataset manifest validator:** the empty manifest validated (`valid: true`, no errors); there are zero dataset samples.
+
+   `vulngenome doctor --json experiments/results/capabilities.json` recorded `angr`, Claripy, Z3, pytest, and Pydantic importable; Zig 0.15.2 reported a version but failed its operational probe with the self-executable-path error. Ghidra, Rizin, and objdump were not found.
+
+6. **Controlled fixture compile attempt:** the bundled Python executable ran `outputs/vulngenome/scripts/compile_fixture.py --out-dir work/compiled-final`. It failed with `error: unable to find zig self exe path: Unexpected`. No fixture binary hashes, patch-pair result, or binary-linked solver result exist.
+
+## Final verification after implementation changes
+
+- `python -m compileall -q outputs/vulngenome/src outputs/vulngenome/tests outputs/vulngenome/scripts`: exit code 0.
+- Final test command used the bundled Python 3.12.14 executable with `PYTHONPATH=work\zig015;work\python-deps;outputs\vulngenome\src` and `pytest -q -p no:cacheprovider --basetemp=work\pytest-final2 outputs\vulngenome\tests`.
+- Observed final suite: **21 passed, 1 skipped**, exit code 0. The only skipped test is compiled-binary integration; its reason remains the Zig self-executable-path error.
+- The manifest validator again returned `valid: true` for `datasets/manifests/empty.json`; this confirms schema handling only, not dataset coverage.
+
+## Controlled fixture execution attempt
+
+- Date: 2026-10-21 (client local date).
+- Runtime: Python 3.12.14, pytest 9.1.1, angr 10.0.4, Claripy 9.3.7, Z3 5.1.0; locally available Zig reports 0.15.2. No `clang`, GCC, or MSVC compiler was found on PATH or at the checked standard LLVM/Visual Studio install paths.
+- Zig `version` and `env` both returned exit code 0. The controlled-pair runner was then executed with output and cache paths under the workspace scratch directory. It returned exit code 2 before producing either shared object. First compile attempt failed renaming Zig temporary libc/compiler-cache outputs with `Permission denied`; after redirecting temporary and Zig cache directories to workspace scratch, compilation still failed writing Zig-generated `builtin.zig` cache outputs with `Unexpected`.
+- Direct command: `python -B -m pytest -q -p no:cacheprovider --basetemp=<workspace scratch> tests/test_binary_integration.py`. Observed: **1 failed**, exit code 1; the fixture compilation subprocess exited 2.
+- Full command: `python -B -m pytest -q -p no:cacheprovider --basetemp=<workspace scratch> tests`. Observed: **21 passed, 1 failed**, exit code 1. The failure is the compiled-binary integration test, which reached fixture compilation because `zig env` succeeded.
+- No vulnerable or patched binary was successfully produced. Therefore no binary hashes, binary-derived patch comparison, or binary-linked symbolic results are available from this attempt. The earlier 21-passed/1-skipped result remains historical; this run does not reproduce it because the Zig availability probe now succeeds while `zig cc` cannot write compiler intermediates.
+- A further retry explicitly set `ZIG_LIB_DIR`, `ZIG_GLOBAL_CACHE_DIR`, `ZIG_LOCAL_CACHE_DIR`, `TMP`, and `TEMP` to absolute paths under the workspace scratch area. `zig env` reported the overrides, but the compiler still failed with `Unexpected` while writing generated `builtin.zig` cache files. This indicates the failure is not fixed by redirecting the compiler paths.
+- The integration test supplies capacity 16 and its provenance from the controlled fixture contract; any eventual result remains scoped to that manual annotation and reached symbolic paths. No implementation or fixture source was changed in this attempt.
+
+## Windows Zig filesystem diagnosis
+
+- Date: 2026-10-21 (client local date). All diagnostics ran from the Codex PowerShell process as `DESKTOP-3NTLSAN\REDA NADIR`; the project-test working directory was `C:\Users\REDA NADIR\Documents\Codex\2026-10-14\files-pasted-by-the-user-mission\outputs\vulngenome`.
+- The test resolves `ziglang` from `C:\Users\REDA NADIR\Documents\Codex\2026-10-14\files-pasted-by-the-user-mission\work\zig015\ziglang\__init__.py` and invokes `C:\Users\REDA NADIR\Documents\Codex\2026-10-14\files-pasted-by-the-user-mission\work\zig015\ziglang\zig.exe` (not found on PATH). `zig version` returned `0.15.2` (exit 0); `zig env` returned exit 0 and identified the bundled `lib`/`std`, host target `x86_64-windows...-gnu`, and an AppContainer `...AppData\Local\Packages\sandbox.<id>\AC\zig` global cache.
+- The test and fixture helper do not set a subprocess `cwd`; the compiler inherits the caller's project-root directory. In the reproductions, `TEMP` and `TMP` were the current process's `...AppData\Local\Packages\sandbox.<id>\AC\Temp`; `ZIG_LIB_DIR`, `ZIG_GLOBAL_CACHE_DIR`, and `ZIG_LOCAL_CACHE_DIR` were unset for the default-path reproduction.
+- The exact fixture compiler argv was: `[zig.exe, cc, -target, x86_64-linux-musl, -O0, -g, -fno-stack-protector, -fPIC, -shared, fixtures/transfer_vulnerable.c, -o, <workspace scratch>/transfer_vulnerable.so]`. The raw subprocess returned 1, stdout was empty, and stderr was:
+
+  ```text
+  error: unable to rename temporary 'C:\Users\REDA NADIR\AppData\Local\Packages\sandbox.{4961cc11-f872-4e5b-a138-6b703733b10f}\AC\zig\tmp\a5bc4eed9db947af-transfer_vulnerable-6591dceb.o.tmp' to output file 'C:\Users\REDA NADIR\AppData\Local\Packages\sandbox.{4961cc11-f872-4e5b-a138-6b703733b10f}\AC\zig\tmp\a5bc4eed9db947af-transfer_vulnerable.o': 'Permission denied'
+  1 error generated.
+  error: unable to rename temporary 'C:/Users/REDA NADIR/AppData/Local/Packages/sandbox.{4961cc11-f872-4e5b-a138-6b703733b10f}/AC/Temp/libc-65816c-7b3908b9.s.tmp' to output file 'C:/Users/REDA NADIR/AppData/Local/Packages/sandbox.{4961cc11-f872-4e5b-a138-6b703733b10f}/AC/Temp/libc-65816c.s': 'Permission denied'
+  1 error generated.
+  ```
+
+- This is after Zig launches and begins C/libc subcompilation. It fails while publishing temporary object and libc assembly files by rename, before the linker writes the requested shared object. It is not a Zig launch, standard-library discovery, or output-directory failure.
+- Filesystem probes: ordinary create and delete succeeded in `TEMP`; create succeeded but same-directory rename returned `Access to the path is denied` in `TEMP` and the AppContainer `AC` cache area. The reported ACLs granted the current user and package SID `FullControl`, so the observed rename denial is not explained by a missing ordinary ACL grant. Create, rename, and delete all succeeded in the workspace scratch directory.
+- A self-authored `hello.c` was compiled outside pytest with the same Zig executable. With inherited AppContainer temp/cache, the host-target compile returned 1 and reported MinGW `.def` conversion errors plus the same denied renames for cached `.obj.tmp` and `crt2.o` outputs. No executable was produced or run.
+- A second minimal compile redirected `TEMP`, `TMP`, `ZIG_GLOBAL_CACHE_DIR`, and `ZIG_LOCAL_CACHE_DIR` to a dedicated workspace scratch directory. `zig env` confirmed those paths, but after about 86 seconds Zig returned 1 with `Unexpected` while writing generated `builtin.zig` files in the redirected global cache (and cascading MinGW subcompilation failures). No executable was produced or run. Thus redirecting to workspace scratch does not currently provide a working correction; the internal Windows operation behind Zig's `Unexpected` remains unresolved.
+- The demonstrated default-path cause is the Codex AppContainer filesystem policy denying rename operations in its `AC` temp/cache paths despite the displayed ACL grants. The remaining uncertainty is why Zig reports `Unexpected` for generated cache writes after redirection to the workspace, where ordinary shell create/rename/delete succeeds. No permissions, global settings, compiler installation, fixtures, or implementation files were changed. Diagnostic source and compiler cache/output files were kept outside the project in `work\zigdiag-20261021`. Cleanup was attempted only for this task-created folder, but the app sandbox rejected the recursive deletion before it ran (`sandbox_approval` is disabled); the folder remains and no files were deleted.
+- Alternative compiler check: no `zig`, `clang`, `gcc`, `cc`, `cl`, or `tcc` executable was found on PATH; the standard `Program Files` LLVM and Visual Studio Build Tools locations checked in this environment were absent. No download or install was attempted.
+- The project integration and full-suite results remain the same as the prior entry: direct integration **1 failed**; full suite **21 passed, 1 failed**, exit 1. Phase 5 was not repeated because the minimal and fixture compilers remain unable to produce binaries. The concrete next blocker is a compiler process context that can perform Zig's cache/temp writes and renames (or diagnosis of the `Unexpected` cache-write path); changing permissions or moving execution outside this sandbox requires approval and was not done.
+
+## Existing toolchain and cache-path follow-up
+
+- Date: 2026-10-21 (client local date). Read-only compiler discovery found no `clang`, `clang-cl`, GCC/MinGW, MSVC `cl`, `cc`, `c++`, `tcc`, or linker executable on PATH. Checked standard LLVM, MSYS2/MinGW, Strawberry Perl, Visual Studio Build Tools, Git-for-Windows, and Chocolatey paths were absent; both Visual Studio registry SxS keys checked were absent. WSL is present as `C:\Windows\System32\wsl.exe`, but the earlier recorded WSL status/list calls returned `Wsl/E_ACCESSDENIED`.
+- Zig 0.15.2 remains present at `C:\Users\REDA NADIR\Documents\Codex\2026-10-14\files-pasted-by-the-user-mission\work\zig015\ziglang\zig.exe`. It can target `x86_64-linux-musl` in principle, but its actual fixture compile fails in the recorded temp/cache file operations, so it is not currently usable to produce the required ELF `.so` pair.
+- The only additional local compiler artifact found was the already-existing TinyCC package tree: AMD64 executable `C:\Users\REDA NADIR\Documents\Codex\2026-10-14\files-pasted-by-the-user-mission\work\tinycc-src\tinycc\amd64\tcc.exe` and x86 executable `...\work\tinycc-src\tinycc\x86\tcc.exe`. Package metadata identifies TinyCC 0.9.26 (Python wrapper package version 1.1); the package is not installed as a Python distribution. A read-only `tcc.exe -v` launch attempt on the AMD64 binary failed before process start with `[WinError 623] {Illegal System DLL Relocation}`. It is not a usable compiler here, and its Windows-oriented package does not establish support for the required `x86_64-linux-musl` ELF shared-object target.
+- Cache-path check used only `zig env` (no compile). With default process settings, `TEMP` and `TMP` were `...AppData\Local\Packages\sandbox.<id>\AC\Temp`; `ZIG_LIB_DIR`, `ZIG_GLOBAL_CACHE_DIR`, and `ZIG_LOCAL_CACHE_DIR` were unset; Zig reported its default global cache under the same AppContainer `AC` directory. With the prior diagnostic overrides, `ZIG_GLOBAL_CACHE_DIR` and `ZIG_LOCAL_CACHE_DIR` contained the full absolute paths under `work\zigdiag-20261021\minimal-redirect`, and `TEMP`/`TMP` pointed to that diagnostic's `tmp` directory. `zig env` honored the override: because that command's working directory was the mission root, it rendered the global cache as the equivalent relative path `work\zigdiag-20261021\minimal-redirect\global`. This is a display-path normalization, not a mismatch. The prior minimal compile's `Unexpected` errors named `builtin.zig` files inside that selected global cache.
+- The existing diagnostic cache was inspected read-only and remains untouched; its global cache contains about 2,507 files / 63.1 MB. No new cache or build was created in this follow-up, no fixture binary exists, and no tests were rerun. The latest test outcomes remain 1 failed integration test and 21 passed / 1 failed for the full suite.
+- No source, fixture, test, dependency, or system setting was changed. The only file changed in this follow-up is this log. The next step requires an approved compiler execution context that allows Zig to perform its temp/cache operations, or an approved narrowly scoped permission/environment change; none was requested or performed here.
+
+## Controlled vulnerable/patched binary experiment with Clang
+
+- Date: 2026-10-21 (client local date). The two original fixture sources were hashed before work and re-hashed after the experiment; both hashes are unchanged: `transfer_vulnerable.c` `5e90df4d4b4e39db7badae6889bf33d85388f79d827585473cc2b05052d3a557` and `transfer_patched.c` `7d3016b668f10ad792f710603db136f0379e977b975582993a10ed8269258d41`. No fixture source was edited.
+- Existing system compiler discovery had found no usable compiler. An official LLVM 23.1.4 x86-64 Windows archive was downloaded to workspace `work`, outside the project, and verified against the release-page SHA-256 `1a3f2f998e230b5791cc4e2bfe11a1f7c07fe42c96ff44f227c9db0bedfaf091` (archive size 276,626,313 bytes). The archive contains Clang, LLD, runtime DLLs, and Clang resource headers. Windows `tar.exe -tf` could not decode its Zstandard frame due to the decoder memory limit. A locally extracted `zstandard==0.25.0` wheel (SHA-256 `ffef5a74088f1e09947aecf91011136665152e0b4b359c42be3373897fb39b01`) was used for safe streaming extraction into `work/llvm-23.1.4-tools`; no package was installed into Python and no project environment was changed. Clang SHA-256: `2fcd72a41bbc6bcf8e89c63555c4db7451da53bf47082fb91d6b1c1e990636ad`; LLD SHA-256: `92052a2d6dbd722fe31ef1991f1522f3c8200cc78917bf65920f3790148c4c36`.
+- `clang.exe --version` returned exit 0 and identified Clang 23.1.4; adjacent `ld.lld.exe --version` returned exit 0 and identified LLD 23.1.4. Both fixture compile commands returned exit 0. The command template was `clang.exe --target=x86_64-linux-musl -O0 -g -fno-stack-protector -fPIC -shared -nostdlib -fuse-ld=lld -Wl,-Bsymbolic <fixture.c> -o <fixture.so>`. `-nostdlib` allowed linking these self-contained C fixtures without a Linux sysroot; `-Wl,-Bsymbolic` binds their internal sink call directly, avoiding a duplicate PLT entry that the current exact-name resolver treated as ambiguous. The original fixture code and principal optimization/debug/hardening flags were retained.
+- Output binaries were real ELF64 x86-64 shared objects, stored outside the project at `work/clang-fixture-run-20261021/binaries/`. Vulnerable SHA-256: `af5b3a669e147a4b9cd1f674c20ec5cbec73d1b54c57d66ac74ede8a26b1dd33`. Patched SHA-256: `f5fc4b99929a4a6c0bb0bc57fc13a5ef495b5110218a87b540ae1fd7f2f0a8fc`.
+- Initial real-binary analysis exposed an angr 10 API mismatch: this angr build provides its Rust-backed Claripy as `angr.claripy`, while importing the separately installed top-level Claripy 9.3.7 creates incompatible AST objects. The symbolic adapter now uses angr's own ASTs, initializes the Linux AMD64 first argument in RDI, and serializes the path expression to QF_BV SMT-LIB for the configured Z3 solver. Its current argument-register adapter explicitly returns INCONCLUSIVE for targets other than Linux AMD64.
+- The existing binary integration test was run with `VULNGENOME_CLANG` set to the verified executable: **1 passed**, exit 0. The full suite was then run with the same compiler selection: **22 passed**, exit 0. These results are execution records from this environment; they do not establish generality beyond the supported target and controlled fixture annotation.
+- The recorded experiment is `experiments/results/controlled-fixture-clang-20261021.json` (SHA-256 `4e7dbc71733a6cd040a096ad6023988745b60e6dd107550740bb0c38c2177384`). angr reported CFG and VEX available for both binaries, and the pair comparison classified `transfer` as `symbol_supported` with 2 versus 5 CFG blocks. The binary-derived call-site check used the manual controlled-fixture contract annotation, capacity 16: vulnerable `POTENTIAL_VIOLATION` / `sat`, one path to the call, 4 exploration steps, exploration complete; patched `PROPERTY_HOLDS_WITHIN_MODEL` / `unsat`, one path to the call, 5 exploration steps, exploration complete. The stored SMT-LIB shows the patched path condition `length <= 16` conjoined with the violation query `length > 16`; it is not simplified away in the record. This is evidence that this controlled fixture reaches the expected modeled distinction; it does not infer capacity, prove equivalence, or establish a real-world vulnerability finding. Synthetic Z3 validation and the unrelated `where.exe` environment probe remain separate evidence types.
+- Files changed by this task: `scripts/compile_fixture.py`, `scripts/run_fixture_experiment.py`, `src/vulngenome/symbolic.py`, `tests/test_binary_integration.py`, this log, and the new controlled experiment JSON. No fixture source or dependency manifest was changed. The downloaded LLVM archive, decompressor wheel, extracted toolchain, and compiled binaries are outside the project under `work`.

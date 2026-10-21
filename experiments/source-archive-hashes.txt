@@ -1,0 +1,4 @@
+# PyPI source archive SHA-256 digests, verified against each PyPI JSON record.
+arpy-1.1.1.tar.gz 3ec36309d2234648ef8dcd2118fe7d81c30195087e0353473546583f3434e776
+mulpyplexer-0.09.tar.gz 144e9e9bf66d3988f60542c9d3d4c94857438f7908f60e53f4c1cb1622fbbd30
+tinycc-1.1.tar.gz decc99beebdbbd1110bc44e6b2fd2a4531b0f126ac5dd65a3e867dd4ac536f1e

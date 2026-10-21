@@ -1,0 +1,31 @@
+{
+  "executables": {
+    "ghidra": false,
+    "objdump": false,
+    "rizin": false,
+    "zig": false
+  },
+  "fixture_compiler": {
+    "error": "error: unable to find zig self exe path: Unexpected",
+    "operational": false,
+    "zig_version": "0.15.2"
+  },
+  "modules": {
+    "angr": true,
+    "claripy": true,
+    "pydantic": true,
+    "pytest": true,
+    "z3": true
+  },
+  "platform": "win32",
+  "python": "3.12.14 (main, Aug 25 2026, 14:01:42) [MSC v.1944 64 bit (AMD64)]",
+  "supported_analysis": [
+    "PE/ELF metadata via stdlib",
+    "CFG/VEX only when angr imports successfully"
+  ],
+  "unsupported_claims": [
+    "no CVE dataset results are currently measured",
+    "no LLM/RAG provider configured"
+  ],
+  "version": "0.1.0"
+}

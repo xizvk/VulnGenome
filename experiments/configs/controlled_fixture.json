@@ -1,0 +1,13 @@
+{
+  "config_schema": "1.0",
+  "experiment_id": "controlled_fixture_range_guard",
+  "status": "defined_but_not_executed",
+  "blocker": "current task sandbox cannot run Zig's compiler driver",
+  "compiler": {"name": "zig cc", "version": "0.15.2", "target": "x86_64-linux-musl", "optimization": "O0", "debug_symbols": true},
+  "analysis": {"engine": "angr", "version": "10.0.4", "cfg": "CFGFast", "ir": "VEX"},
+  "solver": {"engine": "Claripy/Z3", "version": "5.1.0.0", "timeout_ms": 5000},
+  "fixture_contract": "fixtures/contract.json",
+  "partition": "development",
+  "claims_allowed": ["controlled-fixture plumbing only"],
+  "claims_not_allowed": ["real-world CVE accuracy", "general object-size inference", "cross-implementation transfer"]
+}

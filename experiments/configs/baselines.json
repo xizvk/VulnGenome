@@ -1,0 +1,14 @@
+{
+  "config_schema": "1.0",
+  "status": "protocol_only_not_run",
+  "baselines": [
+    {"id": "raw_llm", "method": "decompiled vulnerable/patched pair plus advisory", "status": "unavailable_no_provider"},
+    {"id": "structured_llm", "method": "LLM with structured binary evidence", "status": "unavailable_no_provider"},
+    {"id": "llm_rag", "method": "LLM plus provenance-tracked retrieval", "status": "not_implemented"},
+    {"id": "exact_symbol_diff", "method": "unique exact symbol matches and CFG/call deltas", "status": "implemented_not_benchmarked"},
+    {"id": "similarity_retrieval", "method": "function embedding or graph ranking", "status": "not_implemented"},
+    {"id": "pipeline_without_smt", "method": "evidence pipeline without formal checking", "status": "not_implemented"},
+    {"id": "pipeline_without_slicing", "method": "full pipeline without dependence slices", "status": "not_implemented"},
+    {"id": "pipeline_without_rag", "method": "full pipeline without retrieval", "status": "not_implemented"}
+  ]
+}

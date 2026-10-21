@@ -1,0 +1,11 @@
+{
+  "config_schema": "1.0",
+  "status": "protocol_only_not_run",
+  "ablations": [
+    {"id": "remove_smt", "component_removed": "symbolic verification"},
+    {"id": "remove_dependence_slice", "component_removed": "data-dependence slice"},
+    {"id": "remove_retrieval", "component_removed": "RAG"},
+    {"id": "remove_typed_dsl", "component_removed": "typed invariant validation"}
+  ],
+  "rule": "Compare on identical held-out samples and preserve each run's failures and abstentions."
+}

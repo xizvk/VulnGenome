@@ -1,0 +1,18 @@
+{
+  "expressions": {
+    "expr_offset": {"expr_id": "expr_offset", "width": 8, "signedness": "unsigned", "origin": "synthetic solver smoke"},
+    "expr_length": {"expr_id": "expr_length", "width": 8, "signedness": "unsigned", "origin": "synthetic solver smoke"},
+    "expr_capacity": {"expr_id": "expr_capacity", "width": 8, "signedness": "unsigned", "origin": "synthetic solver smoke"}
+  },
+  "evidence_ids": ["controlled_query_1"],
+  "path_constraints": [
+    "(= expr_offset #xff)",
+    "(= expr_length #x01)",
+    "(= expr_capacity #x00)"
+  ],
+  "unresolved_assumptions": [],
+  "metadata": {
+    "record_type": "synthetic_solver_smoke",
+    "not_binary_evidence": true
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "assumptions": [],
+  "backend": "z3-python",
+  "evidence_refs": [
+    "controlled_query_1"
+  ],
+  "model": "[expr_capacity = 0, expr_offset = 255, expr_length = 1]",
+  "query_smt2": "(set-logic QF_BV)\n(declare-fun expr_capacity () (_ BitVec 8))\n(declare-fun expr_length () (_ BitVec 8))\n(declare-fun expr_offset () (_ BitVec 8))\n(assert (= expr_offset #xff))\n(assert (= expr_length #x01))\n(assert (= expr_capacity #x00))\n(assert (not (bvule (bvadd ((_ zero_extend 1) expr_offset) ((_ zero_extend 1) expr_length)) ((_ zero_extend 1) expr_capacity))))\n(check-sat)",
+  "reason": null,
+  "solver_result": "sat",
+  "solver_version": "5.1.0",
+  "status": "POTENTIAL_VIOLATION",
+  "timeout_ms": 5000
+}

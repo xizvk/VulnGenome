@@ -1,0 +1,18 @@
+{
+  "version": "1.0",
+  "kind": "range_safety",
+  "roles": {
+    "offset": "expr_offset",
+    "length": "expr_length",
+    "capacity": "expr_capacity"
+  },
+  "property": "offset_plus_length_le_capacity",
+  "program_point": "synthetic_smt_smoke",
+  "evidence_refs": ["controlled_query_1"],
+  "assumptions": [],
+  "parameters": {},
+  "provenance": {
+    "record_type": "synthetic_solver_smoke",
+    "not_binary_evidence": true
+  }
+}

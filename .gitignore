@@ -1,0 +1,46 @@
+# Python bytecode and test caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local virtual environments
+.venv/
+venv/
+env/
+
+# Temporary and editor files
+*.tmp
+*.temp
+*.swp
+
+# Build and analysis caches
+build/
+dist/
+*.egg-info/
+.zig-cache/
+zig-cache/
+zig-out/
+.angr_cache/
+
+# Local secrets and private-key material
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+
+# Generated compiled artifacts
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dll
+*.exe
+*.elf
+*.pdb
+
+# Environment-specific diagnostic dump; preserve locally, exclude from Git
+/experiments/results/environment-probe-where.json

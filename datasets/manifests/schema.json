@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "VulnGenome dataset manifest records",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["sample_id", "project", "source_commit", "patch_id", "binary_sha256", "compiler", "flags", "optimization", "architecture", "partition", "invariant_family", "annotation_provenance", "inclusion_rationale"],
+    "properties": {
+      "sample_id": {"type": "string", "minLength": 1},
+      "cve_id": {"type": ["string", "null"]},
+      "project": {"type": "string", "minLength": 1},
+      "source_commit": {"type": "string", "minLength": 1},
+      "patch_id": {"type": "string", "minLength": 1},
+      "binary_sha256": {"type": "object", "additionalProperties": {"type": "string", "pattern": "^[0-9a-f]{64}$"}},
+      "compiler": {"type": "string"},
+      "flags": {"type": "array", "items": {"type": "string"}},
+      "optimization": {"type": "string"},
+      "architecture": {"type": "string"},
+      "partition": {"enum": ["development", "validation", "test"]},
+      "invariant_family": {"type": "string"},
+      "annotation_provenance": {"type": "string"},
+      "inclusion_rationale": {"type": "string"},
+      "exclusion_rationale": {"type": "string"},
+      "ground_truth_ambiguity": {"type": "string"}
+    },
+    "additionalProperties": true
+  }
+}

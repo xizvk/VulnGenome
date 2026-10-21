@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vulngenome"
+version = "0.1.0"
+description = "Evidence-grounded binary invariant research prototype"
+requires-python = ">=3.12"
+dependencies = [
+  "angr==10.0.4",
+  "claripy==9.3.7",
+  "pydantic==2.13.5",
+  "z3-solver==5.1.0.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest==9.1.1"]
+fixture = ["ziglang==0.15.2"]
+
+[project.scripts]
+vulngenome = "vulngenome.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0",
+  "fixture_id": "controlled-range-guard",
+  "capacity": 16,
+  "capacity_provenance": "manual controlled-fixture annotation: BUFFER_CAPACITY in both C sources",
+  "function": "transfer",
+  "sensitive_call": "sensitive_sink",
+  "integer_argument_index": 0,
+  "integer_signedness": "unsigned size_t",
+  "expected_vulnerable_path": "the sensitive call is reachable with length > 16",
+  "expected_patched_path": "every explored path to the sensitive call has length <= 16",
+  "ground_truth_scope": "controlled fixture only; not a real-world vulnerability annotation"
+}

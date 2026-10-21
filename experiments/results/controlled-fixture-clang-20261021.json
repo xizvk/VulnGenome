@@ -1,0 +1,930 @@
+{
+  "binaries": {
+    "patched": {
+      "path": "C:\\Users\\REDA NADIR\\Documents\\Codex\\2026-10-14\\files-pasted-by-the-user-mission\\work\\clang-fixture-run-20261021\\binaries\\transfer_patched.so",
+      "sha256": "f5fc4b99929a4a6c0bb0bc57fc13a5ef495b5110218a87b540ae1fd7f2f0a8fc"
+    },
+    "vulnerable": {
+      "path": "C:\\Users\\REDA NADIR\\Documents\\Codex\\2026-10-14\\files-pasted-by-the-user-mission\\work\\clang-fixture-run-20261021\\binaries\\transfer_vulnerable.so",
+      "sha256": "af5b3a669e147a4b9cd1f674c20ec5cbec73d1b54c57d66ac74ede8a26b1dd33"
+    }
+  },
+  "binary_analysis": {
+    "patched": {
+      "analyzer": "angr",
+      "analyzer_version": "10.0.4",
+      "capabilities": {
+        "cfg": true,
+        "metadata": true,
+        "symbols": false,
+        "vex": true
+      },
+      "errors": [],
+      "functions": [
+        {
+          "address": 4199232,
+          "blocks": [
+            {
+              "address": 4199232,
+              "instruction_count": 7,
+              "instructions": [
+                {
+                  "address": 4199232,
+                  "bytes": "55",
+                  "mnemonic": "push",
+                  "op_str": "rbp"
+                },
+                {
+                  "address": 4199233,
+                  "bytes": "4889e5",
+                  "mnemonic": "mov",
+                  "op_str": "rbp, rsp"
+                },
+                {
+                  "address": 4199236,
+                  "bytes": "48897df8",
+                  "mnemonic": "mov",
+                  "op_str": "qword ptr [rbp - 8], rdi"
+                },
+                {
+                  "address": 4199240,
+                  "bytes": "48c745f000000000",
+                  "mnemonic": "mov",
+                  "op_str": "qword ptr [rbp - 0x10], 0"
+                },
+                {
+                  "address": 4199248,
+                  "bytes": "488b45f0",
+                  "mnemonic": "mov",
+                  "op_str": "rax, qword ptr [rbp - 0x10]"
+                },
+                {
+                  "address": 4199252,
+                  "bytes": "483b45f8",
+                  "mnemonic": "cmp",
+                  "op_str": "rax, qword ptr [rbp - 8]"
+                },
+                {
+                  "address": 4199256,
+                  "bytes": "7322",
+                  "mnemonic": "jae",
+                  "op_str": "0x40137c"
+                }
+              ],
+              "size": 26,
+              "vex": "IRSB {\n   t0:Ity_I64 t1:Ity_I64 t2:Ity_I64 t3:Ity_I64 t4:Ity_I64 t5:Ity_I64 t6:Ity_I64 t7:Ity_I64 t8:Ity_I64 t9:Ity_I64 t10:Ity_I64 t11:Ity_I64 t12:Ity_I64 t13:Ity_I64 t14:Ity_I64 t15:Ity_I64 t16:Ity_I64 t17:Ity_I64 t18:Ity_I64 t19:Ity_I64 t20:Ity_I64 t21:Ity_I64 t22:Ity_I1 t23:Ity_I64 t24:Ity_I64 t25:Ity_I64 t26:Ity_I64 t27:Ity_I64 t28:Ity_I64 t29:Ity_I1 t30:Ity_I1\n\n   00 | ------ IMark(0x401340, 1, 0) ------\n   01 | t0 = GET:I64(rbp)\n   02 | t10 = GET:I64(rsp)\n   03 | t9 = Sub64(t10,0x0000000000000008)\n   04 | PUT(rsp) = t9\n   05 | STle(t9) = t0\n   06 | ------ IMark(0x401341, 3, 0) ------\n   07 | PUT(rbp) = t9\n   08 | PUT(rip) = 0x0000000000401344\n   09 | ------ IMark(0x401344, 4, 0) ------\n   10 | t12 = Add64(t9,0xfffffffffffffff8)\n   11 | t14 = GET:I64(rdi)\n   12 | STle(t12) = t14\n   13 | PUT(rip) = 0x0000000000401348\n   14 | ------ IMark(0x401348, 8, 0) ------\n   15 | t15 = Add64(t9,0xfffffffffffffff0)\n   16 | STle(t15) = 0x0000000000000000\n   17 | PUT(rip) = 0x0000000000401350\n   18 | ------ IMark(0x401350, 4, 0) ------\n   19 | t17 = Add64(t9,0xfffffffffffffff0)\n   20 | t19 = LDle:I64(t17)\n   21 | PUT(rax) = t19\n   22 | PUT(rip) = 0x0000000000401354\n   23 | ------ IMark(0x401354, 4, 0) ------\n   24 | t20 = Add64(t9,0xfffffffffffffff8)\n   25 | t6 = LDle:I64(t20)\n   26 | PUT(cc_op) = 0x0000000000000008\n   27 | PUT(cc_dep1) = t19\n   28 | PUT(cc_dep2) = t6\n   29 | PUT(cc_ndep) = 0x0000000000000000\n   30 | PUT(rip) = 0x0000000000401358\n   31 | ------ IMark(0x401358, 2, 0) ------\n   32 | t29 = CmpLT64U(t19,t6)\n   33 | t28 = 1Uto64(t29)\n   34 | t27 = t28\n   35 | t30 = 64to1(t27)\n   36 | t22 = t30\n   37 | if (t22) { PUT(rip) = 0x40135a; Ijk_Boring }\n   NEXT: PUT(rip) = 0x000000000040137c; Ijk_Boring\n}"
+            },
+            {
+              "address": 4199248,
+              "instruction_count": 3,
+              "instructions": [
+                {
+                  "address": 4199248,
+                  "bytes": "488b45f0",
+                  "mnemonic": "mov",
+                  "op_str": "rax, qword ptr [rbp - 0x10]"
+                },
+                {
+                  "address": 4199252,
+                  "bytes": "483b45f8",
+                  "mnemonic": "cmp",
+                  "op_str": "rax, qword ptr [rbp - 8]"
+                },
+                {
+                  "address": 4199256,
+                  "bytes": "7322",
+                  "mnemonic": "jae",
+                  "op_str": "0x40137c"
+                }
+              ],
+              "size": 10,
+              "vex": "IRSB {\n   t0:Ity_I64 t1:Ity_I64 t2:Ity_I64 t3:Ity_I64 t4:Ity_I64 t5:Ity_I64 t6:Ity_I64 t7:Ity_I64 t8:Ity_I64 t9:Ity_I64 t10:Ity_I1 t11:Ity_I64 t12:Ity_I64 t13:Ity_I64 t14:Ity_I64 t15:Ity_I64 t16:Ity_I64 t17:Ity_I1 t18:Ity_I1\n\n   00 | ------ IMark(0x401350, 4, 0) ------\n   01 | t6 = GET:I64(rbp)\n   02 | t5 = Add64(t6,0xfffffffffffffff0)\n   03 | t7 = LDle:I64(t5)\n   04 | PUT(rax) = t7\n   05 | PUT(rip) = 0x0000000000401354\n   06 | ------ IMark(0x401354, 4, 0) ------\n   07 | t8 = Add64(t6,0xfffffffffffffff8)\n   08 | t2 = LDle:I64(t8)\n   09 | PUT(cc_op) = 0x0000000000000008\n   10 | PUT(cc_dep1) = t7\n   11 | PUT(cc_dep2) = t2\n   12 | PUT(cc_ndep) = 0x0000000000000000\n   13 | PUT(rip) = 0x0000000000401358\n   14 | ------ IMark(0x401358, 2, 0) ------\n   15 | t17 = CmpLT64U(t7,t2)\n   16 | t16 = 1Uto64(t17)\n   17 | t15 = t16\n   18 | t18 = 64to1(t15)\n   19 | t10 = t18\n   20 | if (t10) { PUT(rip) = 0x40135a; Ijk_Boring }\n   NEXT: PUT(rip) = 0x000000000040137c; Ijk_Boring\n}"
+            },
+            {
+              "address": 4199258,
+              "instruction_count": 9,
+              "instructions": [
+                {
+                  "address": 4199258,
+                  "bytes": "488b45f0",
+                  "mnemonic": "mov",
+                  "op_str": "rax, qword ptr [rbp - 0x10]"
+                },
+                {
+                  "address": 4199262,
+                  "bytes": "88c2",
+                  "mnemonic": "mov",
+                  "op_str": "dl, al"
+                },
+                {
+                  "address": 4199264,
+                  "bytes": "488b4df0",
+                  "mnemonic": "mov",
+                  "op_str": "rcx, qword ptr [rbp - 0x10]"
+                },
+                {
+                  "address": 4199268,
+                  "bytes": "488d05c5200000",
+                  "mnemonic": "lea",
+                  "op_str": "rax, [rip + 0x20c5]"
+                },
+                {
+                  "address": 4199275,
+                  "bytes": "881408",
+                  "mnemonic": "mov",
+                  "op_str": "byte ptr [rax + rcx], dl"
+                },
+                {
+                  "address": 4199278,
+                  "bytes": "488b45f0",
+                  "mnemonic": "mov",
+                  "op_str": "rax, qword ptr [rbp - 0x10]"
+                },
+                {
+                  "address": 4199282,
+                  "bytes": "4883c001",
+                  "mnemonic": "add",
+                  "op_str": "rax, 1"
+                },
+                {
+                  "address": 4199286,
+                  "bytes": "488945f0",
+                  "mnemonic": "mov",
+                  "op_str": "qword ptr [rbp - 0x10], rax"
+                },
+                {
+                  "address": 4199290,
+                  "bytes": "ebd4",
+                  "mnemonic": "jmp",
+                  "op_str": "0x401350"
+                }
+              ],
+              "size": 34,
+              "vex": "IRSB {\n   t0:Ity_I64 t1:Ity_I64 t2:Ity_I64 t3:Ity_I64 t4:Ity_I64 t5:Ity_I64 t6:Ity_I64 t7:Ity_I64 t8:Ity_I64 t9:Ity_I64 t10:Ity_I64 t11:Ity_I64 t12:Ity_I8 t13:Ity_I64 t14:Ity_I64 t15:Ity_I64 t16:Ity_I64 t17:Ity_I64 t18:Ity_I64 t19:Ity_I64 t20:Ity_I64 t21:Ity_I8 t22:Ity_I64 t23:Ity_I64 t24:Ity_I64 t25:Ity_I64 t26:Ity_I64 t27:Ity_I64 t28:Ity_I64\n\n   00 | ------ IMark(0x40135a, 4, 0) ------\n   01 | t10 = GET:I64(rbp)\n   02 | t9 = Add64(t10,0xfffffffffffffff0)\n   03 | t11 = LDle:I64(t9)\n   04 | ------ IMark(0x40135e, 2, 0) ------\n   05 | t12 = 64to8(t11)\n   06 | PUT(dl) = t12\n   07 | PUT(rip) = 0x0000000000401360\n   08 | ------ IMark(0x401360, 4, 0) ------\n   09 | t14 = Add64(t10,0xfffffffffffffff0)\n   10 | t16 = LDle:I64(t14)\n   11 | PUT(rcx) = t16\n   12 | ------ IMark(0x401364, 7, 0) ------\n   13 | PUT(rip) = 0x000000000040136b\n   14 | ------ IMark(0x40136b, 3, 0) ------\n   15 | t17 = Add64(0x0000000000403430,t16)\n   16 | t22 = GET:I64(rdx)\n   17 | t21 = 64to8(t22)\n   18 | STle(t17) = t21\n   19 | PUT(rip) = 0x000000000040136e\n   20 | ------ IMark(0x40136e, 4, 0) ------\n   21 | t23 = Add64(t10,0xfffffffffffffff0)\n   22 | t25 = LDle:I64(t23)\n   23 | ------ IMark(0x401372, 4, 0) ------\n   24 | t5 = Add64(t25,0x0000000000000001)\n   25 | PUT(cc_op) = 0x0000000000000004\n   26 | PUT(cc_dep1) = t25\n   27 | PUT(cc_dep2) = 0x0000000000000001\n   28 | PUT(cc_ndep) = 0x0000000000000000\n   29 | PUT(rax) = t5\n   30 | PUT(rip) = 0x0000000000401376\n   31 | ------ IMark(0x401376, 4, 0) ------\n   32 | t26 = Add64(t10,0xfffffffffffffff0)\n   33 | STle(t26) = t5\n   34 | ------ IMark(0x40137a, 2, 0) ------\n   NEXT: PUT(rip) = 0x0000000000401350; Ijk_Boring\n}"
+            },
+            {
+              "address": 4199292,
+              "instruction_count": 2,
+              "instructions": [
+                {
+                  "address": 4199292,
+                  "bytes": "5d",
+                  "mnemonic": "pop",
+                  "op_str": "rbp"
+                },
+                {
+                  "address": 4199293,
+                  "bytes": "c3",
+                  "mnemonic": "ret",
+                  "op_str": ""
+                }
+              ],
+              "size": 2,
+              "vex": "IRSB {\n   t0:Ity_I64 t1:Ity_I64 t2:Ity_I64 t3:Ity_I64 t4:Ity_I64 t5:Ity_I64 t6:Ity_I64\n\n   00 | ------ IMark(0x40137c, 1, 0) ------\n   01 | t1 = GET:I64(rsp)\n   02 | t0 = LDle:I64(t1)\n   03 | t5 = Add64(t1,0x0000000000000008)\n   04 | PUT(rsp) = t5\n   05 | PUT(rbp) = t0\n   06 | PUT(rip) = 0x000000000040137d\n   07 | ------ IMark(0x40137d, 1, 0) ------\n   08 | t3 = LDle:I64(t5)\n   09 | t4 = Add64(t5,0x0000000000000008)\n   10 | PUT(rsp) = t4\n   11 | t6 = Sub64(t4,0x0000000000000080)\n   12 | ====== AbiHint(0xt6, 128, t3) ======\n   NEXT: PUT(rip) = t3; Ijk_Ret\n}"
+            }
+          ],
+          "calls": [],
+          "is_simprocedure": false,
+          "name": "sensitive_sink",
+          "size": 62,
+          "vex_block_count": 4
+        },
+        {
+          "address": 4199294,
+          "blocks": [
+            {
+              "address": 4199294,
+              "instruction_count": 7,
+              "instructions": [
+                {
+                  "address": 4199294,
+                  "bytes": "6690",
+                  "mnemonic": "nop",
+                  "op_str": ""
+                },
+                {
+                  "address": 4199296,
+                  "bytes": "55",
+                  "mnemonic": "push",
+                  "op_str": "rbp"
+                },
+                {
+                  "address": 4199297,
+                  "bytes": "4889e5",
+                  "mnemonic": "mov",
+                  "op_str": "rbp, rsp"
+                },
+                {
+                  "address": 4199300,
+                  "bytes": "4883ec10",
+                  "mnemonic": "sub",
+                  "op_str": "rsp, 0x10"
+                },
+                {
+                  "address": 4199304,
+                  "bytes": "48897df0",
+                  "mnemonic": "mov",
+                  "op_str": "qword ptr [rbp - 0x10], rdi"
+                },
+                {
+                  "address": 4199308,
+                  "bytes": "48837df010",
+                  "mnemonic": "cmp",
+                  "op_str": "qword ptr [rbp - 0x10], 0x10"
+                },
+                {
+                  "address": 4199313,
+                  "bytes": "7609",
+                  "mnemonic": "jbe",
+                  "op_str": "0x40139c"
+                }
+              ],
+              "size": 21,
+              "vex": "IRSB {\n   t0:Ity_I64 t1:Ity_I64 t2:Ity_I64 t3:Ity_I64 t4:Ity_I64 t5:Ity_I64 t6:Ity_I64 t7:Ity_I64 t8:Ity_I64 t9:Ity_I64 t10:Ity_I64 t11:Ity_I64 t12:Ity_I64 t13:Ity_I64 t14:Ity_I64 t15:Ity_I64 t16:Ity_I64 t17:Ity_I64 t18:Ity_I1 t19:Ity_I64 t20:Ity_I64 t21:Ity_I64 t22:Ity_I64 t23:Ity_I64 t24:Ity_I64 t25:Ity_I1 t26:Ity_I1\n\n   00 | ------ IMark(0x40137e, 2, 0) ------\n   01 | PUT(rip) = 0x0000000000401380\n   02 | ------ IMark(0x401380, 1, 0) ------\n   03 | t0 = GET:I64(rbp)\n   04 | t11 = GET:I64(rsp)\n   05 | t10 = Sub64(t11,0x0000000000000008)\n   06 | PUT(rsp) = t10\n   07 | STle(t10) = t0\n   08 | ------ IMark(0x401381, 3, 0) ------\n   09 | PUT(rbp) = t10\n   10 | ------ IMark(0x401384, 4, 0) ------\n   11 | t2 = Sub64(t10,0x0000000000000010)\n   12 | PUT(rsp) = t2\n   13 | PUT(rip) = 0x0000000000401388\n   14 | ------ IMark(0x401388, 4, 0) ------\n   15 | t13 = Add64(t10,0xfffffffffffffff0)\n   16 | t15 = GET:I64(rdi)\n   17 | STle(t13) = t15\n   18 | PUT(rip) = 0x000000000040138c\n   19 | ------ IMark(0x40138c, 5, 0) ------\n   20 | t16 = Add64(t10,0xfffffffffffffff0)\n   21 | t8 = LDle:I64(t16)\n   22 | PUT(cc_op) = 0x0000000000000008\n   23 | PUT(cc_dep1) = t8\n   24 | PUT(cc_dep2) = 0x0000000000000010\n   25 | PUT(cc_ndep) = 0x0000000000000000\n   26 | PUT(rip) = 0x0000000000401391\n   27 | ------ IMark(0x401391, 2, 0) ------\n   28 | t25 = CmpLE64U(t8,0x0000000000000010)\n   29 | t24 = 1Uto64(t25)\n   30 | t23 = t24\n   31 | t26 = 64to1(t23)\n   32 | t18 = t26\n   33 | if (t18) { PUT(rip) = 0x40139c; Ijk_Boring }\n   NEXT: PUT(rip) = 0x0000000000401393; Ijk_Boring\n}"
+            }
+          ],
+          "calls": [],
+          "is_simprocedure": false,
+          "name": "sub_40137e",
+          "size": 2,
+          "vex_block_count": 1
+        },
+        {
+          "address": 4199296,
+          "blocks": [
+            {
+              "address": 4199296,
+              "instruction_count": 6,
+              "instructions": [
+                {
+                  "address": 4199296,
+                  "bytes": "55",
+                  "mnemonic": "push",
+                  "op_str": "rbp"
+                },
+                {
+                  "address": 4199297,
+                  "bytes": "4889e5",
+                  "mnemonic": "mov",
+                  "op_str": "rbp, rsp"
+                },
+                {
+                  "address": 4199300,
+                  "bytes": "4883ec10",
+                  "mnemonic": "sub",
+                  "op_str": "rsp, 0x10"
+                },
+                {
+                  "address": 4199304,
+                  "bytes": "48897df0",
+                  "mnemonic": "mov",
+                  "op_str": "qword ptr [rbp - 0x10], rdi"
+                },
+                {
+                  "address": 4199308,
+                  "bytes": "48837df010",
+                  "mnemonic": "cmp",
+                  "op_str": "qword ptr [rbp - 0x10], 0x10"
+                },
+                {
+                  "address": 4199313,
+                  "bytes": "7609",
+                  "mnemonic": "jbe",
+                  "op_str": "0x40139c"
+                }
+              ],
+              "size": 19,
+              "vex": "IRSB {\n   t0:Ity_I64 t1:Ity_I64 t2:Ity_I64 t3:Ity_I64 t4:Ity_I64 t5:Ity_I64 t6:Ity_I64 t7:Ity_I64 t8:Ity_I64 t9:Ity_I64 t10:Ity_I64 t11:Ity_I64 t12:Ity_I64 t13:Ity_I64 t14:Ity_I64 t15:Ity_I64 t16:Ity_I64 t17:Ity_I64 t18:Ity_I1 t19:Ity_I64 t20:Ity_I64 t21:Ity_I64 t22:Ity_I64 t23:Ity_I64 t24:Ity_I64 t25:Ity_I1 t26:Ity_I1\n\n   00 | ------ IMark(0x401380, 1, 0) ------\n   01 | t0 = GET:I64(rbp)\n   02 | t11 = GET:I64(rsp)\n   03 | t10 = Sub64(t11,0x0000000000000008)\n   04 | PUT(rsp) = t10\n   05 | STle(t10) = t0\n   06 | ------ IMark(0x401381, 3, 0) ------\n   07 | PUT(rbp) = t10\n   08 | ------ IMark(0x401384, 4, 0) ------\n   09 | t2 = Sub64(t10,0x0000000000000010)\n   10 | PUT(rsp) = t2\n   11 | PUT(rip) = 0x0000000000401388\n   12 | ------ IMark(0x401388, 4, 0) ------\n   13 | t13 = Add64(t10,0xfffffffffffffff0)\n   14 | t15 = GET:I64(rdi)\n   15 | STle(t13) = t15\n   16 | PUT(rip) = 0x000000000040138c\n   17 | ------ IMark(0x40138c, 5, 0) ------\n   18 | t16 = Add64(t10,0xfffffffffffffff0)\n   19 | t8 = LDle:I64(t16)\n   20 | PUT(cc_op) = 0x0000000000000008\n   21 | PUT(cc_dep1) = t8\n   22 | PUT(cc_dep2) = 0x0000000000000010\n   23 | PUT(cc_ndep) = 0x0000000000000000\n   24 | PUT(rip) = 0x0000000000401391\n   25 | ------ IMark(0x401391, 2, 0) ------\n   26 | t25 = CmpLE64U(t8,0x0000000000000010)\n   27 | t24 = 1Uto64(t25)\n   28 | t23 = t24\n   29 | t26 = 64to1(t23)\n   30 | t18 = t26\n   31 | if (t18) { PUT(rip) = 0x40139c; Ijk_Boring }\n   NEXT: PUT(rip) = 0x0000000000401393; Ijk_Boring\n}"
+            },
+            {
+              "address": 4199315,
+              "instruction_count": 2,
+              "instructions": [
+                {
+                  "address": 4199315,
+                  "bytes": "c745fcffffffff",
+                  "mnemonic": "mov",
+                  "op_str": "dword ptr [rbp - 4], 0xffffffff"
+                },
+                {
+                  "address": 4199322,
+                  "bytes": "eb10",
+                  "mnemonic": "jmp",
+                  "op_str": "0x4013ac"
+                }
+              ],
+              "size": 9,
+              "vex": "IRSB {\n   t0:Ity_I64 t1:Ity_I64 t2:Ity_I64\n\n   00 | ------ IMark(0x401393, 7, 0) ------\n   01 | t2 = GET:I64(rbp)\n   02 | t1 = Add64(t2,0xfffffffffffffffc)\n   03 | STle(t1) = 0xffffffff\n   04 | ------ IMark(0x40139a, 2, 0) ------\n   NEXT: PUT(rip) = 0x00000000004013ac; Ijk_Boring\n}"
+            },
+            {
+              "address": 4199324,
+              "instruction_count": 2,
+              "instructions": [
+                {
+                  "address": 4199324,
+                  "bytes": "488b7df0",
+                  "mnemonic": "mov",
+                  "op_str": "rdi, qword ptr [rbp - 0x10]"
+                },
+                {
+                  "address": 4199328,
+                  "bytes": "e89bffffff",
+                  "mnemonic": "call",
+                  "op_str": "0x401340"
+                }
+              ],
+              "size": 9,
+              "vex": "IRSB {\n   t0:Ity_I64 t1:Ity_I64 t2:Ity_I64 t3:Ity_I64 t4:Ity_I64 t5:Ity_I64 t6:Ity_I64 t7:Ity_I64 t8:Ity_I64\n\n   00 | ------ IMark(0x40139c, 4, 0) ------\n   01 | t4 = GET:I64(rbp)\n   02 | t3 = Add64(t4,0xfffffffffffffff0)\n   03 | t5 = LDle:I64(t3)\n   04 | PUT(rdi) = t5\n   05 | PUT(rip) = 0x00000000004013a0\n   06 | ------ IMark(0x4013a0, 5, 0) ------\n   07 | t7 = GET:I64(rsp)\n   08 | t6 = Sub64(t7,0x0000000000000008)\n   09 | PUT(rsp) = t6\n   10 | STle(t6) = 0x00000000004013a5\n   11 | t8 = Sub64(t6,0x0000000000000080)\n   12 | ====== AbiHint(0xt8, 128, 0x0000000000401340) ======\n   NEXT: PUT(rip) = 0x0000000000401340; Ijk_Call\n}"
+            },
+            {
+              "address": 4199333,
+              "instruction_count": 5,
+              "instructions": [
+                {
+                  "address": 4199333,
+                  "bytes": "c745fc00000000",
+                  "mnemonic": "mov",
+                  "op_str": "dword ptr [rbp - 4], 0"
+                },
+                {
+                  "address": 4199340,
+                  "bytes": "8b45fc",
+                  "mnemonic": "mov",
+                  "op_str": "eax, dword ptr [rbp - 4]"
+                },
+                {
+                  "address": 4199343,
+                  "bytes": "4883c410",
+                  "mnemonic": "add",
+                  "op_str": "rsp, 0x10"
+                },
+                {
+                  "address": 4199347,
+                  "bytes": "5d",
+                  "mnemonic": "pop",
+                  "op_str": "rbp"
+                },
+                {
+                  "address": 4199348,
+                  "bytes": "c3",
+                  "mnemonic": "ret",
+                  "op_str": ""
+                }
+              ],
+              "size": 16,
+              "vex": "IRSB {\n   t0:Ity_I64 t1:Ity_I64 t2:Ity_I64 t3:Ity_I64 t4:Ity_I64 t5:Ity_I64 t6:Ity_I64 t7:Ity_I64 t8:Ity_I64 t9:Ity_I64 t10:Ity_I64 t11:Ity_I64 t12:Ity_I64 t13:Ity_I64 t14:Ity_I64 t15:Ity_I32 t16:Ity_I64 t17:Ity_I64\n\n   00 | ------ IMark(0x4013a5, 7, 0) ------\n   01 | t11 = GET:I64(rbp)\n   02 | t10 = Add64(t11,0xfffffffffffffffc)\n   03 | STle(t10) = 0x00000000\n   04 | PUT(rip) = 0x00000000004013ac\n   05 | ------ IMark(0x4013ac, 3, 0) ------\n   06 | t12 = Add64(t11,0xfffffffffffffffc)\n   07 | t15 = LDle:I32(t12)\n   08 | t14 = 32Uto64(t15)\n   09 | PUT(rax) = t14\n   10 | ------ IMark(0x4013af, 4, 0) ------\n   11 | t4 = GET:I64(rsp)\n   12 | t2 = Add64(t4,0x0000000000000010)\n   13 | PUT(cc_op) = 0x0000000000000004\n   14 | PUT(cc_dep1) = t4\n   15 | PUT(cc_dep2) = 0x0000000000000010\n   16 | PUT(cc_ndep) = 0x0000000000000000\n   17 | PUT(rsp) = t2\n   18 | PUT(rip) = 0x00000000004013b3\n   19 | ------ IMark(0x4013b3, 1, 0) ------\n   20 | t5 = LDle:I64(t2)\n   21 | t16 = Add64(t2,0x0000000000000008)\n   22 | PUT(rsp) = t16\n   23 | PUT(rbp) = t5\n   24 | PUT(rip) = 0x00000000004013b4\n   25 | ------ IMark(0x4013b4, 1, 0) ------\n   26 | t8 = LDle:I64(t16)\n   27 | t9 = Add64(t16,0x0000000000000008)\n   28 | PUT(rsp) = t9\n   29 | t17 = Sub64(t9,0x0000000000000080)\n   30 | ====== AbiHint(0xt17, 128, t8) ======\n   NEXT: PUT(rip) = t8; Ijk_Ret\n}"
+            },
+            {
+              "address": 4199340,
+              "instruction_count": 4,
+              "instructions": [
+                {
+                  "address": 4199340,
+                  "bytes": "8b45fc",
+                  "mnemonic": "mov",
+                  "op_str": "eax, dword ptr [rbp - 4]"
+                },
+                {
+                  "address": 4199343,
+                  "bytes": "4883c410",
+                  "mnemonic": "add",
+                  "op_str": "rsp, 0x10"
+                },
+                {
+                  "address": 4199347,
+                  "bytes": "5d",
+                  "mnemonic": "pop",
+                  "op_str": "rbp"
+                },
+                {
+                  "address": 4199348,
+                  "bytes": "c3",
+                  "mnemonic": "ret",
+                  "op_str": ""
+                }
+              ],
+              "size": 9,
+              "vex": "IRSB {\n   t0:Ity_I64 t1:Ity_I64 t2:Ity_I64 t3:Ity_I64 t4:Ity_I64 t5:Ity_I64 t6:Ity_I64 t7:Ity_I64 t8:Ity_I64 t9:Ity_I64 t10:Ity_I64 t11:Ity_I64 t12:Ity_I32 t13:Ity_I64 t14:Ity_I64\n\n   00 | ------ IMark(0x4013ac, 3, 0) ------\n   01 | t10 = GET:I64(rbp)\n   02 | t9 = Add64(t10,0xfffffffffffffffc)\n   03 | t12 = LDle:I32(t9)\n   04 | t11 = 32Uto64(t12)\n   05 | PUT(rax) = t11\n   06 | ------ IMark(0x4013af, 4, 0) ------\n   07 | t3 = GET:I64(rsp)\n   08 | t1 = Add64(t3,0x0000000000000010)\n   09 | PUT(cc_op) = 0x0000000000000004\n   10 | PUT(cc_dep1) = t3\n   11 | PUT(cc_dep2) = 0x0000000000000010\n   12 | PUT(cc_ndep) = 0x0000000000000000\n   13 | PUT(rsp) = t1\n   14 | PUT(rip) = 0x00000000004013b3\n   15 | ------ IMark(0x4013b3, 1, 0) ------\n   16 | t4 = LDle:I64(t1)\n   17 | t13 = Add64(t1,0x0000000000000008)\n   18 | PUT(rsp) = t13\n   19 | PUT(rbp) = t4\n   20 | PUT(rip) = 0x00000000004013b4\n   21 | ------ IMark(0x4013b4, 1, 0) ------\n   22 | t7 = LDle:I64(t13)\n   23 | t8 = Add64(t13,0x0000000000000008)\n   24 | PUT(rsp) = t8\n   25 | t14 = Sub64(t8,0x0000000000000080)\n   26 | ====== AbiHint(0xt14, 128, t7) ======\n   NEXT: PUT(rip) = t7; Ijk_Ret\n}"
+            }
+          ],
+          "calls": [
+            {
+              "address": 4199324,
+              "name": "sensitive_sink",
+              "target": 4199232
+            }
+          ],
+          "is_simprocedure": false,
+          "name": "transfer",
+          "size": 53,
+          "vex_block_count": 5
+        }
+      ],
+      "metadata": {
+        "architecture": "x86-64",
+        "build_id": null,
+        "endianness": "little",
+        "entry_point": 0,
+        "file_format": "ELF64",
+        "image_base": 0,
+        "path": "C:\\Users\\REDA NADIR\\Documents\\Codex\\2026-10-14\\files-pasted-by-the-user-mission\\work\\clang-fixture-run-20261021\\binaries\\transfer_patched.so",
+        "sections": [],
+        "sha256": "f5fc4b99929a4a6c0bb0bc57fc13a5ef495b5110218a87b540ae1fd7f2f0a8fc",
+        "size_bytes": 4424,
+        "symbols_available": false,
+        "warnings": [
+          "ELF section/symbol and build-id extraction is not implemented by the stdlib parser"
+        ]
+      },
+      "warnings": []
+    },
+    "vulnerable": {
+      "analyzer": "angr",
+      "analyzer_version": "10.0.4",
+      "capabilities": {
+        "cfg": true,
+        "metadata": true,
+        "symbols": false,
+        "vex": true
+      },
+      "errors": [],
+      "functions": [
+        {
+          "address": 4199232,
+          "blocks": [
+            {
+              "address": 4199232,
+              "instruction_count": 7,
+              "instructions": [
+                {
+                  "address": 4199232,
+                  "bytes": "55",
+                  "mnemonic": "push",
+                  "op_str": "rbp"
+                },
+                {
+                  "address": 4199233,
+                  "bytes": "4889e5",
+                  "mnemonic": "mov",
+                  "op_str": "rbp, rsp"
+                },
+                {
+                  "address": 4199236,
+                  "bytes": "48897df8",
+                  "mnemonic": "mov",
+                  "op_str": "qword ptr [rbp - 8], rdi"
+                },
+                {
+                  "address": 4199240,
+                  "bytes": "48c745f000000000",
+                  "mnemonic": "mov",
+                  "op_str": "qword ptr [rbp - 0x10], 0"
+                },
+                {
+                  "address": 4199248,
+                  "bytes": "488b45f0",
+                  "mnemonic": "mov",
+                  "op_str": "rax, qword ptr [rbp - 0x10]"
+                },
+                {
+                  "address": 4199252,
+                  "bytes": "483b45f8",
+                  "mnemonic": "cmp",
+                  "op_str": "rax, qword ptr [rbp - 8]"
+                },
+                {
+                  "address": 4199256,
+                  "bytes": "7322",
+                  "mnemonic": "jae",
+                  "op_str": "0x40137c"
+                }
+              ],
+              "size": 26,
+              "vex": "IRSB {\n   t0:Ity_I64 t1:Ity_I64 t2:Ity_I64 t3:Ity_I64 t4:Ity_I64 t5:Ity_I64 t6:Ity_I64 t7:Ity_I64 t8:Ity_I64 t9:Ity_I64 t10:Ity_I64 t11:Ity_I64 t12:Ity_I64 t13:Ity_I64 t14:Ity_I64 t15:Ity_I64 t16:Ity_I64 t17:Ity_I64 t18:Ity_I64 t19:Ity_I64 t20:Ity_I64 t21:Ity_I64 t22:Ity_I1 t23:Ity_I64 t24:Ity_I64 t25:Ity_I64 t26:Ity_I64 t27:Ity_I64 t28:Ity_I64 t29:Ity_I1 t30:Ity_I1\n\n   00 | ------ IMark(0x401340, 1, 0) ------\n   01 | t0 = GET:I64(rbp)\n   02 | t10 = GET:I64(rsp)\n   03 | t9 = Sub64(t10,0x0000000000000008)\n   04 | PUT(rsp) = t9\n   05 | STle(t9) = t0\n   06 | ------ IMark(0x401341, 3, 0) ------\n   07 | PUT(rbp) = t9\n   08 | PUT(rip) = 0x0000000000401344\n   09 | ------ IMark(0x401344, 4, 0) ------\n   10 | t12 = Add64(t9,0xfffffffffffffff8)\n   11 | t14 = GET:I64(rdi)\n   12 | STle(t12) = t14\n   13 | PUT(rip) = 0x0000000000401348\n   14 | ------ IMark(0x401348, 8, 0) ------\n   15 | t15 = Add64(t9,0xfffffffffffffff0)\n   16 | STle(t15) = 0x0000000000000000\n   17 | PUT(rip) = 0x0000000000401350\n   18 | ------ IMark(0x401350, 4, 0) ------\n   19 | t17 = Add64(t9,0xfffffffffffffff0)\n   20 | t19 = LDle:I64(t17)\n   21 | PUT(rax) = t19\n   22 | PUT(rip) = 0x0000000000401354\n   23 | ------ IMark(0x401354, 4, 0) ------\n   24 | t20 = Add64(t9,0xfffffffffffffff8)\n   25 | t6 = LDle:I64(t20)\n   26 | PUT(cc_op) = 0x0000000000000008\n   27 | PUT(cc_dep1) = t19\n   28 | PUT(cc_dep2) = t6\n   29 | PUT(cc_ndep) = 0x0000000000000000\n   30 | PUT(rip) = 0x0000000000401358\n   31 | ------ IMark(0x401358, 2, 0) ------\n   32 | t29 = CmpLT64U(t19,t6)\n   33 | t28 = 1Uto64(t29)\n   34 | t27 = t28\n   35 | t30 = 64to1(t27)\n   36 | t22 = t30\n   37 | if (t22) { PUT(rip) = 0x40135a; Ijk_Boring }\n   NEXT: PUT(rip) = 0x000000000040137c; Ijk_Boring\n}"
+            },
+            {
+              "address": 4199248,
+              "instruction_count": 3,
+              "instructions": [
+                {
+                  "address": 4199248,
+                  "bytes": "488b45f0",
+                  "mnemonic": "mov",
+                  "op_str": "rax, qword ptr [rbp - 0x10]"
+                },
+                {
+                  "address": 4199252,
+                  "bytes": "483b45f8",
+                  "mnemonic": "cmp",
+                  "op_str": "rax, qword ptr [rbp - 8]"
+                },
+                {
+                  "address": 4199256,
+                  "bytes": "7322",
+                  "mnemonic": "jae",
+                  "op_str": "0x40137c"
+                }
+              ],
+              "size": 10,
+              "vex": "IRSB {\n   t0:Ity_I64 t1:Ity_I64 t2:Ity_I64 t3:Ity_I64 t4:Ity_I64 t5:Ity_I64 t6:Ity_I64 t7:Ity_I64 t8:Ity_I64 t9:Ity_I64 t10:Ity_I1 t11:Ity_I64 t12:Ity_I64 t13:Ity_I64 t14:Ity_I64 t15:Ity_I64 t16:Ity_I64 t17:Ity_I1 t18:Ity_I1\n\n   00 | ------ IMark(0x401350, 4, 0) ------\n   01 | t6 = GET:I64(rbp)\n   02 | t5 = Add64(t6,0xfffffffffffffff0)\n   03 | t7 = LDle:I64(t5)\n   04 | PUT(rax) = t7\n   05 | PUT(rip) = 0x0000000000401354\n   06 | ------ IMark(0x401354, 4, 0) ------\n   07 | t8 = Add64(t6,0xfffffffffffffff8)\n   08 | t2 = LDle:I64(t8)\n   09 | PUT(cc_op) = 0x0000000000000008\n   10 | PUT(cc_dep1) = t7\n   11 | PUT(cc_dep2) = t2\n   12 | PUT(cc_ndep) = 0x0000000000000000\n   13 | PUT(rip) = 0x0000000000401358\n   14 | ------ IMark(0x401358, 2, 0) ------\n   15 | t17 = CmpLT64U(t7,t2)\n   16 | t16 = 1Uto64(t17)\n   17 | t15 = t16\n   18 | t18 = 64to1(t15)\n   19 | t10 = t18\n   20 | if (t10) { PUT(rip) = 0x40135a; Ijk_Boring }\n   NEXT: PUT(rip) = 0x000000000040137c; Ijk_Boring\n}"
+            },
+            {
+              "address": 4199258,
+              "instruction_count": 9,
+              "instructions": [
+                {
+                  "address": 4199258,
+                  "bytes": "488b45f0",
+                  "mnemonic": "mov",
+                  "op_str": "rax, qword ptr [rbp - 0x10]"
+                },
+                {
+                  "address": 4199262,
+                  "bytes": "88c2",
+                  "mnemonic": "mov",
+                  "op_str": "dl, al"
+                },
+                {
+                  "address": 4199264,
+                  "bytes": "488b4df0",
+                  "mnemonic": "mov",
+                  "op_str": "rcx, qword ptr [rbp - 0x10]"
+                },
+                {
+                  "address": 4199268,
+                  "bytes": "488d05a5200000",
+                  "mnemonic": "lea",
+                  "op_str": "rax, [rip + 0x20a5]"
+                },
+                {
+                  "address": 4199275,
+                  "bytes": "881408",
+                  "mnemonic": "mov",
+                  "op_str": "byte ptr [rax + rcx], dl"
+                },
+                {
+                  "address": 4199278,
+                  "bytes": "488b45f0",
+                  "mnemonic": "mov",
+                  "op_str": "rax, qword ptr [rbp - 0x10]"
+                },
+                {
+                  "address": 4199282,
+                  "bytes": "4883c001",
+                  "mnemonic": "add",
+                  "op_str": "rax, 1"
+                },
+                {
+                  "address": 4199286,
+                  "bytes": "488945f0",
+                  "mnemonic": "mov",
+                  "op_str": "qword ptr [rbp - 0x10], rax"
+                },
+                {
+                  "address": 4199290,
+                  "bytes": "ebd4",
+                  "mnemonic": "jmp",
+                  "op_str": "0x401350"
+                }
+              ],
+              "size": 34,
+              "vex": "IRSB {\n   t0:Ity_I64 t1:Ity_I64 t2:Ity_I64 t3:Ity_I64 t4:Ity_I64 t5:Ity_I64 t6:Ity_I64 t7:Ity_I64 t8:Ity_I64 t9:Ity_I64 t10:Ity_I64 t11:Ity_I64 t12:Ity_I8 t13:Ity_I64 t14:Ity_I64 t15:Ity_I64 t16:Ity_I64 t17:Ity_I64 t18:Ity_I64 t19:Ity_I64 t20:Ity_I64 t21:Ity_I8 t22:Ity_I64 t23:Ity_I64 t24:Ity_I64 t25:Ity_I64 t26:Ity_I64 t27:Ity_I64 t28:Ity_I64\n\n   00 | ------ IMark(0x40135a, 4, 0) ------\n   01 | t10 = GET:I64(rbp)\n   02 | t9 = Add64(t10,0xfffffffffffffff0)\n   03 | t11 = LDle:I64(t9)\n   04 | ------ IMark(0x40135e, 2, 0) ------\n   05 | t12 = 64to8(t11)\n   06 | PUT(dl) = t12\n   07 | PUT(rip) = 0x0000000000401360\n   08 | ------ IMark(0x401360, 4, 0) ------\n   09 | t14 = Add64(t10,0xfffffffffffffff0)\n   10 | t16 = LDle:I64(t14)\n   11 | PUT(rcx) = t16\n   12 | ------ IMark(0x401364, 7, 0) ------\n   13 | PUT(rip) = 0x000000000040136b\n   14 | ------ IMark(0x40136b, 3, 0) ------\n   15 | t17 = Add64(0x0000000000403410,t16)\n   16 | t22 = GET:I64(rdx)\n   17 | t21 = 64to8(t22)\n   18 | STle(t17) = t21\n   19 | PUT(rip) = 0x000000000040136e\n   20 | ------ IMark(0x40136e, 4, 0) ------\n   21 | t23 = Add64(t10,0xfffffffffffffff0)\n   22 | t25 = LDle:I64(t23)\n   23 | ------ IMark(0x401372, 4, 0) ------\n   24 | t5 = Add64(t25,0x0000000000000001)\n   25 | PUT(cc_op) = 0x0000000000000004\n   26 | PUT(cc_dep1) = t25\n   27 | PUT(cc_dep2) = 0x0000000000000001\n   28 | PUT(cc_ndep) = 0x0000000000000000\n   29 | PUT(rax) = t5\n   30 | PUT(rip) = 0x0000000000401376\n   31 | ------ IMark(0x401376, 4, 0) ------\n   32 | t26 = Add64(t10,0xfffffffffffffff0)\n   33 | STle(t26) = t5\n   34 | ------ IMark(0x40137a, 2, 0) ------\n   NEXT: PUT(rip) = 0x0000000000401350; Ijk_Boring\n}"
+            },
+            {
+              "address": 4199292,
+              "instruction_count": 2,
+              "instructions": [
+                {
+                  "address": 4199292,
+                  "bytes": "5d",
+                  "mnemonic": "pop",
+                  "op_str": "rbp"
+                },
+                {
+                  "address": 4199293,
+                  "bytes": "c3",
+                  "mnemonic": "ret",
+                  "op_str": ""
+                }
+              ],
+              "size": 2,
+              "vex": "IRSB {\n   t0:Ity_I64 t1:Ity_I64 t2:Ity_I64 t3:Ity_I64 t4:Ity_I64 t5:Ity_I64 t6:Ity_I64\n\n   00 | ------ IMark(0x40137c, 1, 0) ------\n   01 | t1 = GET:I64(rsp)\n   02 | t0 = LDle:I64(t1)\n   03 | t5 = Add64(t1,0x0000000000000008)\n   04 | PUT(rsp) = t5\n   05 | PUT(rbp) = t0\n   06 | PUT(rip) = 0x000000000040137d\n   07 | ------ IMark(0x40137d, 1, 0) ------\n   08 | t3 = LDle:I64(t5)\n   09 | t4 = Add64(t5,0x0000000000000008)\n   10 | PUT(rsp) = t4\n   11 | t6 = Sub64(t4,0x0000000000000080)\n   12 | ====== AbiHint(0xt6, 128, t3) ======\n   NEXT: PUT(rip) = t3; Ijk_Ret\n}"
+            }
+          ],
+          "calls": [],
+          "is_simprocedure": false,
+          "name": "sensitive_sink",
+          "size": 62,
+          "vex_block_count": 4
+        },
+        {
+          "address": 4199294,
+          "blocks": [
+            {
+              "address": 4199294,
+              "instruction_count": 7,
+              "instructions": [
+                {
+                  "address": 4199294,
+                  "bytes": "6690",
+                  "mnemonic": "nop",
+                  "op_str": ""
+                },
+                {
+                  "address": 4199296,
+                  "bytes": "55",
+                  "mnemonic": "push",
+                  "op_str": "rbp"
+                },
+                {
+                  "address": 4199297,
+                  "bytes": "4889e5",
+                  "mnemonic": "mov",
+                  "op_str": "rbp, rsp"
+                },
+                {
+                  "address": 4199300,
+                  "bytes": "4883ec10",
+                  "mnemonic": "sub",
+                  "op_str": "rsp, 0x10"
+                },
+                {
+                  "address": 4199304,
+                  "bytes": "48897df8",
+                  "mnemonic": "mov",
+                  "op_str": "qword ptr [rbp - 8], rdi"
+                },
+                {
+                  "address": 4199308,
+                  "bytes": "488b7df8",
+                  "mnemonic": "mov",
+                  "op_str": "rdi, qword ptr [rbp - 8]"
+                },
+                {
+                  "address": 4199312,
+                  "bytes": "e8abffffff",
+                  "mnemonic": "call",
+                  "op_str": "0x401340"
+                }
+              ],
+              "size": 23,
+              "vex": "IRSB {\n   t0:Ity_I64 t1:Ity_I64 t2:Ity_I64 t3:Ity_I64 t4:Ity_I64 t5:Ity_I64 t6:Ity_I64 t7:Ity_I64 t8:Ity_I64 t9:Ity_I64 t10:Ity_I64 t11:Ity_I64 t12:Ity_I64 t13:Ity_I64 t14:Ity_I64 t15:Ity_I64 t16:Ity_I64 t17:Ity_I64 t18:Ity_I64 t19:Ity_I64 t20:Ity_I64\n\n   00 | ------ IMark(0x40137e, 2, 0) ------\n   01 | PUT(rip) = 0x0000000000401380\n   02 | ------ IMark(0x401380, 1, 0) ------\n   03 | t0 = GET:I64(rbp)\n   04 | t10 = GET:I64(rsp)\n   05 | t9 = Sub64(t10,0x0000000000000008)\n   06 | PUT(rsp) = t9\n   07 | STle(t9) = t0\n   08 | ------ IMark(0x401381, 3, 0) ------\n   09 | PUT(rbp) = t9\n   10 | ------ IMark(0x401384, 4, 0) ------\n   11 | t2 = Sub64(t9,0x0000000000000010)\n   12 | PUT(cc_op) = 0x0000000000000008\n   13 | PUT(cc_dep1) = t9\n   14 | PUT(cc_dep2) = 0x0000000000000010\n   15 | PUT(cc_ndep) = 0x0000000000000000\n   16 | PUT(rsp) = t2\n   17 | PUT(rip) = 0x0000000000401388\n   18 | ------ IMark(0x401388, 4, 0) ------\n   19 | t12 = Add64(t9,0xfffffffffffffff8)\n   20 | t14 = GET:I64(rdi)\n   21 | STle(t12) = t14\n   22 | PUT(rip) = 0x000000000040138c\n   23 | ------ IMark(0x40138c, 4, 0) ------\n   24 | t15 = Add64(t9,0xfffffffffffffff8)\n   25 | t17 = LDle:I64(t15)\n   26 | PUT(rdi) = t17\n   27 | PUT(rip) = 0x0000000000401390\n   28 | ------ IMark(0x401390, 5, 0) ------\n   29 | t18 = Sub64(t2,0x0000000000000008)\n   30 | PUT(rsp) = t18\n   31 | STle(t18) = 0x0000000000401395\n   32 | t20 = Sub64(t18,0x0000000000000080)\n   33 | ====== AbiHint(0xt20, 128, 0x0000000000401340) ======\n   NEXT: PUT(rip) = 0x0000000000401340; Ijk_Call\n}"
+            }
+          ],
+          "calls": [],
+          "is_simprocedure": false,
+          "name": "sub_40137e",
+          "size": 2,
+          "vex_block_count": 1
+        },
+        {
+          "address": 4199296,
+          "blocks": [
+            {
+              "address": 4199296,
+              "instruction_count": 6,
+              "instructions": [
+                {
+                  "address": 4199296,
+                  "bytes": "55",
+                  "mnemonic": "push",
+                  "op_str": "rbp"
+                },
+                {
+                  "address": 4199297,
+                  "bytes": "4889e5",
+                  "mnemonic": "mov",
+                  "op_str": "rbp, rsp"
+                },
+                {
+                  "address": 4199300,
+                  "bytes": "4883ec10",
+                  "mnemonic": "sub",
+                  "op_str": "rsp, 0x10"
+                },
+                {
+                  "address": 4199304,
+                  "bytes": "48897df8",
+                  "mnemonic": "mov",
+                  "op_str": "qword ptr [rbp - 8], rdi"
+                },
+                {
+                  "address": 4199308,
+                  "bytes": "488b7df8",
+                  "mnemonic": "mov",
+                  "op_str": "rdi, qword ptr [rbp - 8]"
+                },
+                {
+                  "address": 4199312,
+                  "bytes": "e8abffffff",
+                  "mnemonic": "call",
+                  "op_str": "0x401340"
+                }
+              ],
+              "size": 21,
+              "vex": "IRSB {\n   t0:Ity_I64 t1:Ity_I64 t2:Ity_I64 t3:Ity_I64 t4:Ity_I64 t5:Ity_I64 t6:Ity_I64 t7:Ity_I64 t8:Ity_I64 t9:Ity_I64 t10:Ity_I64 t11:Ity_I64 t12:Ity_I64 t13:Ity_I64 t14:Ity_I64 t15:Ity_I64 t16:Ity_I64 t17:Ity_I64 t18:Ity_I64 t19:Ity_I64 t20:Ity_I64\n\n   00 | ------ IMark(0x401380, 1, 0) ------\n   01 | t0 = GET:I64(rbp)\n   02 | t10 = GET:I64(rsp)\n   03 | t9 = Sub64(t10,0x0000000000000008)\n   04 | PUT(rsp) = t9\n   05 | STle(t9) = t0\n   06 | ------ IMark(0x401381, 3, 0) ------\n   07 | PUT(rbp) = t9\n   08 | ------ IMark(0x401384, 4, 0) ------\n   09 | t2 = Sub64(t9,0x0000000000000010)\n   10 | PUT(cc_op) = 0x0000000000000008\n   11 | PUT(cc_dep1) = t9\n   12 | PUT(cc_dep2) = 0x0000000000000010\n   13 | PUT(cc_ndep) = 0x0000000000000000\n   14 | PUT(rsp) = t2\n   15 | PUT(rip) = 0x0000000000401388\n   16 | ------ IMark(0x401388, 4, 0) ------\n   17 | t12 = Add64(t9,0xfffffffffffffff8)\n   18 | t14 = GET:I64(rdi)\n   19 | STle(t12) = t14\n   20 | PUT(rip) = 0x000000000040138c\n   21 | ------ IMark(0x40138c, 4, 0) ------\n   22 | t15 = Add64(t9,0xfffffffffffffff8)\n   23 | t17 = LDle:I64(t15)\n   24 | PUT(rdi) = t17\n   25 | PUT(rip) = 0x0000000000401390\n   26 | ------ IMark(0x401390, 5, 0) ------\n   27 | t18 = Sub64(t2,0x0000000000000008)\n   28 | PUT(rsp) = t18\n   29 | STle(t18) = 0x0000000000401395\n   30 | t20 = Sub64(t18,0x0000000000000080)\n   31 | ====== AbiHint(0xt20, 128, 0x0000000000401340) ======\n   NEXT: PUT(rip) = 0x0000000000401340; Ijk_Call\n}"
+            },
+            {
+              "address": 4199317,
+              "instruction_count": 4,
+              "instructions": [
+                {
+                  "address": 4199317,
+                  "bytes": "31c0",
+                  "mnemonic": "xor",
+                  "op_str": "eax, eax"
+                },
+                {
+                  "address": 4199319,
+                  "bytes": "4883c410",
+                  "mnemonic": "add",
+                  "op_str": "rsp, 0x10"
+                },
+                {
+                  "address": 4199323,
+                  "bytes": "5d",
+                  "mnemonic": "pop",
+                  "op_str": "rbp"
+                },
+                {
+                  "address": 4199324,
+                  "bytes": "c3",
+                  "mnemonic": "ret",
+                  "op_str": ""
+                }
+              ],
+              "size": 8,
+              "vex": "IRSB {\n   t0:Ity_I32 t1:Ity_I32 t2:Ity_I32 t3:Ity_I64 t4:Ity_I64 t5:Ity_I64 t6:Ity_I64 t7:Ity_I64 t8:Ity_I64 t9:Ity_I64 t10:Ity_I64 t11:Ity_I64 t12:Ity_I32 t13:Ity_I64 t14:Ity_I32 t15:Ity_I64 t16:Ity_I64 t17:Ity_I64 t18:Ity_I64 t19:Ity_I64\n\n   00 | ------ IMark(0x401395, 2, 0) ------\n   01 | PUT(rax) = 0x0000000000000000\n   02 | ------ IMark(0x401397, 4, 0) ------\n   03 | t5 = GET:I64(rsp)\n   04 | t3 = Add64(t5,0x0000000000000010)\n   05 | PUT(cc_op) = 0x0000000000000004\n   06 | PUT(cc_dep1) = t5\n   07 | PUT(cc_dep2) = 0x0000000000000010\n   08 | PUT(cc_ndep) = 0x0000000000000000\n   09 | PUT(rsp) = t3\n   10 | PUT(rip) = 0x000000000040139b\n   11 | ------ IMark(0x40139b, 1, 0) ------\n   12 | t6 = LDle:I64(t3)\n   13 | t18 = Add64(t3,0x0000000000000008)\n   14 | PUT(rsp) = t18\n   15 | PUT(rbp) = t6\n   16 | PUT(rip) = 0x000000000040139c\n   17 | ------ IMark(0x40139c, 1, 0) ------\n   18 | t9 = LDle:I64(t18)\n   19 | t10 = Add64(t18,0x0000000000000008)\n   20 | PUT(rsp) = t10\n   21 | t19 = Sub64(t10,0x0000000000000080)\n   22 | ====== AbiHint(0xt19, 128, t9) ======\n   NEXT: PUT(rip) = t9; Ijk_Ret\n}"
+            }
+          ],
+          "calls": [
+            {
+              "address": 4199296,
+              "name": "sensitive_sink",
+              "target": 4199232
+            }
+          ],
+          "is_simprocedure": false,
+          "name": "transfer",
+          "size": 29,
+          "vex_block_count": 2
+        }
+      ],
+      "metadata": {
+        "architecture": "x86-64",
+        "build_id": null,
+        "endianness": "little",
+        "entry_point": 0,
+        "file_format": "ELF64",
+        "image_base": 0,
+        "path": "C:\\Users\\REDA NADIR\\Documents\\Codex\\2026-10-14\\files-pasted-by-the-user-mission\\work\\clang-fixture-run-20261021\\binaries\\transfer_vulnerable.so",
+        "sections": [],
+        "sha256": "af5b3a669e147a4b9cd1f674c20ec5cbec73d1b54c57d66ac74ede8a26b1dd33",
+        "size_bytes": 4392,
+        "symbols_available": false,
+        "warnings": [
+          "ELF section/symbol and build-id extraction is not implemented by the stdlib parser"
+        ]
+      },
+      "warnings": []
+    }
+  },
+  "fixture_annotation": {
+    "capacity": 16,
+    "capacity_provenance": "manual controlled-fixture annotation: BUFFER_CAPACITY in both C sources",
+    "expected_patched_path": "every explored path to the sensitive call has length <= 16",
+    "expected_vulnerable_path": "the sensitive call is reachable with length > 16",
+    "fixture_id": "controlled-range-guard",
+    "function": "transfer",
+    "ground_truth_scope": "controlled fixture only; not a real-world vulnerability annotation",
+    "integer_argument_index": 0,
+    "integer_signedness": "unsigned size_t",
+    "schema_version": "1.0",
+    "sensitive_call": "sensitive_sink"
+  },
+  "interpretation": "controlled-fixture machinery check only; not a real-world result and not a general capacity-inference result",
+  "patch_evidence": {
+    "capability_limitations": [
+      "no stripped-function structural matcher",
+      "similarity is not equivalence"
+    ],
+    "matches": [
+      {
+        "classification": "symbol_supported",
+        "evidence": [],
+        "evidence_scope": "CFG and recovered call-target deltas; no semantic equivalence claim",
+        "name": "sensitive_sink",
+        "patched_address": 4199232,
+        "patched_call_targets": {},
+        "patched_cfg_blocks": 4,
+        "vulnerable_address": 4199232,
+        "vulnerable_call_targets": {},
+        "vulnerable_cfg_blocks": 4
+      },
+      {
+        "classification": "symbol_supported",
+        "evidence": [],
+        "evidence_scope": "CFG and recovered call-target deltas; no semantic equivalence claim",
+        "name": "sub_40137e",
+        "patched_address": 4199294,
+        "patched_call_targets": {},
+        "patched_cfg_blocks": 1,
+        "vulnerable_address": 4199294,
+        "vulnerable_call_targets": {},
+        "vulnerable_cfg_blocks": 1
+      },
+      {
+        "classification": "symbol_supported",
+        "evidence": [],
+        "evidence_scope": "CFG and recovered call-target deltas; no semantic equivalence claim",
+        "name": "transfer",
+        "patched_address": 4199296,
+        "patched_call_targets": {
+          "sensitive_sink": 1
+        },
+        "patched_cfg_blocks": 5,
+        "vulnerable_address": 4199296,
+        "vulnerable_call_targets": {
+          "sensitive_sink": 1
+        },
+        "vulnerable_cfg_blocks": 2
+      }
+    ],
+    "matching_policy": "unique exact symbol name only",
+    "patched_sha256": "f5fc4b99929a4a6c0bb0bc57fc13a5ef495b5110218a87b540ae1fd7f2f0a8fc",
+    "schema_version": "1.0",
+    "unmatched_patched": [],
+    "unmatched_vulnerable": [],
+    "vulnerable_sha256": "af5b3a669e147a4b9cd1f674c20ec5cbec73d1b54c57d66ac74ede8a26b1dd33"
+  },
+  "record_schema": "1.0",
+  "record_type": "controlled_fixture_experiment",
+  "run_metadata": {
+    "commands": [
+      "python scripts/compile_fixture.py --out-dir <work>/binaries",
+      "python scripts/run_fixture_experiment.py --work-dir <work> --out <record.json>"
+    ],
+    "compiler": {
+      "executable": "C:\\Users\\REDA NADIR\\Documents\\Codex\\2026-10-14\\files-pasted-by-the-user-mission\\work\\llvm-23.1.4-tools\\bin\\clang.exe",
+      "name": "clang",
+      "version": "clang version 23.1.4 (https://github.com/llvm/llvm-project 7a941dfb2877a0b8cf30323fefa85ad019e0b0f5)"
+    },
+    "flags": [
+      "-O0",
+      "-g",
+      "-fno-stack-protector",
+      "-fPIC",
+      "-shared",
+      "-nostdlib",
+      "-fuse-ld=lld",
+      "-Wl,-Bsymbolic"
+    ],
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.12.14 (main, Aug 25 2026, 14:01:42) [MSC v.1944 64 bit (AMD64)]",
+    "target": "x86_64-linux-musl"
+  },
+  "symbolic_callsite_results": {
+    "patched": {
+      "argument_width": 64,
+      "binary_sha256": "f5fc4b99929a4a6c0bb0bc57fc13a5ef495b5110218a87b540ae1fd7f2f0a8fc",
+      "capacity": 16,
+      "capacity_provenance": "manual controlled-fixture annotation in fixtures/contract.json",
+      "counterexample": null,
+      "coverage_note": "only the paths explored to the named call site are considered",
+      "exploration_complete": true,
+      "exploration_steps": 5,
+      "function": "transfer",
+      "path_constraints": [
+        "path_0: (bvule vg_length_8_64 (_ bv16 64))"
+      ],
+      "paths_to_call": 1,
+      "query_smt2": "(set-logic QF_BV)\n(declare-fun vg_length_8_64 () (_ BitVec 64))\n(assert (and (bvule vg_length_8_64 (_ bv16 64)) (bvugt vg_length_8_64 (_ bv16 64))))\n(check-sat)",
+      "reason": "all explored paths to this call satisfy the supplied unsigned bound",
+      "sensitive_call": "sensitive_sink",
+      "solver_result": "unsat",
+      "solver_version": "5.1.0",
+      "status": "PROPERTY_HOLDS_WITHIN_MODEL",
+      "timeout_ms": 5000
+    },
+    "vulnerable": {
+      "argument_width": 64,
+      "binary_sha256": "af5b3a669e147a4b9cd1f674c20ec5cbec73d1b54c57d66ac74ede8a26b1dd33",
+      "capacity": 16,
+      "capacity_provenance": "manual controlled-fixture annotation in fixtures/contract.json",
+      "counterexample": "[vg_length_5_64 = 24]",
+      "coverage_note": "only the paths explored to the named call site are considered",
+      "exploration_complete": true,
+      "exploration_steps": 4,
+      "function": "transfer",
+      "path_constraints": [],
+      "paths_to_call": 1,
+      "query_smt2": "(set-logic QF_BV)\n(declare-fun vg_length_5_64 () (_ BitVec 64))\n(assert (bvugt vg_length_5_64 (_ bv16 64)))\n(check-sat)",
+      "reason": null,
+      "sensitive_call": "sensitive_sink",
+      "solver_result": "sat",
+      "solver_version": "5.1.0",
+      "status": "POTENTIAL_VIOLATION",
+      "timeout_ms": 5000
+    }
+  }
+}
