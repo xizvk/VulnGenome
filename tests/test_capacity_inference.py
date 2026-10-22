@@ -19,7 +19,7 @@ from vulngenome.symbolic import (
 ROOT = Path(__file__).resolve().parents[1]
 EVALUATION_FIXTURES = ROOT / "fixtures" / "evaluation" / "capacity-inference"
 sys.path.insert(0, str(ROOT / "scripts"))
-from compile_fixture import compile_source  # noqa: E402
+from compile_fixture import build_compile_command, compile_source  # noqa: E402
 
 
 def _toolchain_ready() -> bool:
@@ -46,6 +46,19 @@ def _compile(source: Path, output_dir: Path, *, extra_flags: tuple[str, ...] = (
 
 def _compile_evaluation(name: str, output_dir: Path, *, extra_flags: tuple[str, ...] = ()) -> Path:
     return _compile(EVALUATION_FIXTURES / name, output_dir, extra_flags=extra_flags)
+
+
+def _compile_optimized(source: Path, output_dir: Path, optimization: str,
+                       *, extra_flags: tuple[str, ...] = ()) -> Path:
+    """Use the recorded Clang target/flags with one selected optimization level."""
+    if optimization not in {"O1", "O2", "O3", "Os"}:
+        raise ValueError(f"unsupported test optimization level: {optimization}")
+    binary = output_dir / f"{source.stem}-{optimization}.so"
+    binary.parent.mkdir(parents=True, exist_ok=True)
+    command = build_compile_command(source, binary, extra_flags=extra_flags)
+    command[command.index("-O0")] = f"-{optimization}"
+    subprocess.run(command, check=True, capture_output=True, text=True, timeout=60)
+    return binary
 
 
 def _analyze(binary: Path):
@@ -318,3 +331,131 @@ def test_weak_or_loop_guard_does_not_create_a_false_safe_result(tmp_path):
     assert result.capacity is None
     assert result.solver_result == "not-run"
     assert result.status != "PROPERTY_HOLDS_WITHIN_MODEL"
+
+
+@pytest.mark.parametrize("optimization", ["O1", "Os"])
+def test_optimized_scalar_vex_recovers_original_vulnerable_and_patched_pair(tmp_path, optimization):
+    import pytest
+    pytest.importorskip("angr")
+    pytest.importorskip("z3")
+    vulnerable = _compile_optimized(ROOT / "fixtures" / "transfer_vulnerable.c",
+                                    tmp_path / optimization / "vulnerable", optimization)
+    patched = _compile_optimized(ROOT / "fixtures" / "transfer_patched.c",
+                                 tmp_path / optimization / "patched", optimization)
+
+    vulnerable_result = _analyze(vulnerable)
+    patched_result = _analyze(patched)
+    for binary, result in ((vulnerable, vulnerable_result), (patched, patched_result)):
+        digest = hashlib.sha256(binary.read_bytes()).hexdigest()
+        assert result.binary_sha256 == digest
+        assert result.capacity_evidence["binary_sha256"] == digest
+        assert result.capacity_evidence["evidence"]["binary_sha256"] == digest
+        assert result.capacity == 16
+        assert result.capacity_source == "inferred"
+        assert result.capacity_evidence["inferred"] is True
+        relation = result.capacity_evidence["evidence"]["data_flow_relationship"]
+        assert relation["status"] == "PROVEN_SUPPORTED_OPTIMIZED_SCALAR_PATTERN"
+        assert relation["analysis"].startswith("CFGFast + VEX register constant propagation")
+        assert relation["index_width_bits"] == 64
+        assert "equality" in relation["loop_exit_condition"]
+        assert relation["entry_guard"]["instruction"]
+        assert relation["prefix_store"]["instruction"]["mnemonic"].startswith("mov")
+        assert relation["loop_store"]["instruction"]["mnemonic"].startswith("mov")
+    assert vulnerable_result.status == "POTENTIAL_VIOLATION"
+    assert vulnerable_result.solver_result == "sat"
+    assert patched_result.status == "PROPERTY_HOLDS_WITHIN_MODEL"
+    assert patched_result.solver_result == "unsat"
+
+
+@pytest.mark.parametrize("optimization", ["O1", "Os"])
+def test_optimized_controls_preserve_extent_and_detect_bad_caller_guards(tmp_path, optimization):
+    import pytest
+    pytest.importorskip("angr")
+    pytest.importorskip("z3")
+    variants = ROOT / "fixtures" / "variants"
+    changed_capacity = _analyze(_compile_optimized(
+        variants / "transfer_capacity_24.c", tmp_path / "capacity", optimization))
+    oversized_guard = _analyze(_compile_optimized(
+        variants / "transfer_guard_too_large.c", tmp_path / "oversized", optimization))
+    changed_argument = _analyze(_compile_optimized(
+        variants / "transfer_sink_plus_one.c", tmp_path / "shifted", optimization))
+    removed_guard = _analyze(_compile_optimized(
+        ROOT / "fixtures" / "transfer_vulnerable.c", tmp_path / "unguarded", optimization))
+
+    assert changed_capacity.capacity == 24
+    assert changed_capacity.status == "PROPERTY_HOLDS_WITHIN_MODEL"
+    for result in (oversized_guard, changed_argument, removed_guard):
+        assert result.capacity == 16
+        assert result.status == "POTENTIAL_VIOLATION"
+        assert result.solver_result == "sat"
+    assert any("bvadd" in path["sink_argument_expression"]
+               for path in changed_argument.path_evidence)
+
+
+@pytest.mark.parametrize("optimization", ["O1", "Os"])
+def test_optimized_unsupported_decoy_ambiguous_stripped_and_weak_patterns_abstain(tmp_path, optimization):
+    import pytest
+    pytest.importorskip("angr")
+    pytest.importorskip("z3")
+    cases = [
+        (_compile_optimized(EVALUATION_FIXTURES / "unrelated_decoy.c",
+                            tmp_path / "decoy" / optimization, optimization), "decoy"),
+        (_compile_optimized(EVALUATION_FIXTURES / "multiple_candidate_ambiguous.c",
+                            tmp_path / "ambiguous" / optimization, optimization), "ambiguous"),
+        (_compile_optimized(EVALUATION_FIXTURES / "independent_valid.c",
+                            tmp_path / "stripped" / optimization, optimization,
+                            extra_flags=("-Wl,-s",)), "stripped"),
+        (_compile_optimized(EVALUATION_FIXTURES / "weak_guard_or.c",
+                            tmp_path / "weak" / optimization, optimization), "weak guard"),
+    ]
+    # The O0 adversarial cases remain the exact prior controls; this test
+    # checks that optimized forms still abstain without a complete proof.
+    for binary, _label in cases:
+        result = _analyze(binary)
+        assert result.status == "INCONCLUSIVE"
+        assert result.capacity is None
+        assert result.solver_result == "not-run"
+
+
+@pytest.mark.parametrize("optimization", ["O2", "O3"])
+def test_optimized_unrolled_chunked_loop_abstains_with_binary_evidence(tmp_path, optimization):
+    import pytest
+    pytest.importorskip("angr")
+    pytest.importorskip("z3")
+    binary = _compile_optimized(ROOT / "fixtures" / "transfer_vulnerable.c",
+                                tmp_path / optimization, optimization)
+    inference = infer_capacity_from_binary(
+        binary, function_name="transfer", call_name="sensitive_sink")
+    result = _analyze(binary)
+
+    assert inference.status == "INCONCLUSIVE"
+    assert inference.capacity is None
+    assert "multiple register-indexed store instructions" in inference.reason
+    diagnostics = inference.evidence["optimized_vex_diagnostics"]
+    assert diagnostics["dynamic_candidate_count"] == 1
+    assert len(diagnostics["symbol_object_stores"]) > 1
+    assert diagnostics["block_instruction_sequences"]
+    assert result.status == "INCONCLUSIVE"
+    assert result.solver_result == "not-run"
+
+
+@pytest.mark.parametrize("optimization", ["O1", "Os"])
+def test_independent_optimized_pointer_countdown_fixture_remains_inconclusive(tmp_path, optimization):
+    import pytest
+    pytest.importorskip("angr")
+    pytest.importorskip("z3")
+    binary = _compile_optimized(
+        ROOT / "fixtures" / "cross-build" / "telemetry_vulnerable.c",
+        tmp_path / optimization, optimization)
+    result = verify_unsigned_argument_at_call_inferred(
+        binary, function_name="accept_sample", call_name="commit_sample")
+
+    assert result.status == "INCONCLUSIVE"
+    assert result.capacity is None
+    assert result.solver_result == "not-run"
+    evidence = result.capacity_evidence
+    assert evidence["status"] == "INCONCLUSIVE"
+    diagnostics = evidence["evidence"]["optimized_vex_diagnostics"]
+    assert diagnostics["unresolved_store_evidence"]
+    assert any("get" in item["address_expression"]
+               for item in diagnostics["unresolved_store_evidence"])

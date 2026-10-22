@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from .binary import parse_metadata
+from .optimized_vex import infer_optimized_scalar_loop
 
 
 @dataclass(frozen=True)
@@ -227,10 +228,6 @@ def infer_capacity_from_binary(
                            **base_evidence, "unsupported_sink_calls": sink_calls,
                        })
 
-    if not candidate_stores:
-        return abstain("no ELF object symbol is used as a VEX store base in the sensitive function",
-                       caller_addr=int(caller.addr), sink_addr=int(sink.addr), evidence=base_evidence)
-
     entry_info = block_info.get(int(sink.addr))
     if entry_info is None:
         return abstain("the sensitive function entry block could not be recovered",
@@ -239,9 +236,67 @@ def infer_capacity_from_binary(
     entry_defs = entry_info["definitions"]
     frame_expr = _entry_frame_expression(entry_block, entry_defs, entry_block.vex.tyenv,
                                         project.arch.registers["rbp"][0])
-    if frame_expr is None:
-        return abstain("the supported stack-frame argument/index pattern was not recovered",
-                       caller_addr=int(caller.addr), sink_addr=int(sink.addr), evidence=base_evidence)
+    if frame_expr is None or not candidate_stores:
+        try:
+            optimized = infer_optimized_scalar_loop(
+                project, sink, symbols_by_address,
+                int(project.arch.registers["rdi"][0]),
+            )
+        except Exception as exc:
+            return abstain(
+                f"optimized VEX recovery failed: {type(exc).__name__}: {exc}",
+                caller_addr=int(caller.addr), sink_addr=int(sink.addr),
+                evidence=base_evidence,
+            )
+        if optimized.candidate is not None and optimized.relation is not None:
+            symbol_name, symbol_address, capacity = optimized.candidate
+            relation = optimized.relation
+            optimized_method = (
+                "ELF STT_OBJECT extent + VEX register-constant propagation, scalar induction, "
+                "and equality-exit proof"
+            )
+            optimized_assumptions = (
+                *assumptions,
+                "the recovered optimized scalar loop has a binary-derived nonzero entry guard",
+                "the prefix and loop stores are the complete dynamic write pattern for the sensitive function",
+                "the loop's 64-bit equality exit is reached before unsigned counter wrap",
+            )
+            evidence = {
+                **base_evidence,
+                "object_symbol": {"name": symbol_name, "address": symbol_address,
+                                  "size_bytes": capacity, "symbol_type": "STT_OBJECT"},
+                "store_evidence": [
+                    {"block_address": item["block_address"],
+                     "instruction_address": item["instruction"]["address"] if item["instruction"] else None,
+                     "instruction": item["instruction"],
+                     "store_statement": item["address_expression"],
+                     "vex_block": item["vex_block"],
+                     "data_width_bits": item["width_bits"],
+                     "role": role}
+                    for role, item in (("first iteration", relation["prefix_store"]),
+                                       ("loop iteration", relation["loop_store"]))
+                ],
+                "data_flow_relationship": relation,
+                "candidate_assessments": list(optimized.assessments),
+                "optimized_vex_diagnostics": optimized.diagnostics,
+            }
+            evidence_id = "vg-cap-" + hashlib.sha256(
+                f"{digest}:{symbol_name}:{symbol_address:x}:{capacity}:{call_instruction['address']:x}:{argument_index}".encode("utf-8")
+            ).hexdigest()[:20]
+            return CapacityInferenceResult(
+                "INFERRED", digest, metadata.file_format, metadata.architecture,
+                function_name, int(caller.addr), call_name, int(sink.addr), capacity,
+                evidence_id, evidence, optimized_method, optimized_assumptions,
+                True, False, argument_index=argument_index,
+            )
+        return abstain(
+            optimized.reason,
+            caller_addr=int(caller.addr), sink_addr=int(sink.addr), evidence={
+                **base_evidence,
+                "optimized_vex_diagnostics": optimized.diagnostics,
+                "candidate_assessments": list(optimized.assessments),
+            },
+        )
 
     unclassified_stores = [
         {"block_address": item["block_address"],

@@ -17,6 +17,10 @@ from typing import Any
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _PROPERTY_KIND = "sensitive_call_argument_within_object_extent"
+_SUPPORTED_RELATION_STATUSES = {
+    "PROVEN_SUPPORTED_PATTERN",
+    "PROVEN_SUPPORTED_OPTIMIZED_SCALAR_PATTERN",
+}
 
 
 def create_transfer_proposal(source_binary: str | Path, source_result: Any) -> dict[str, Any]:
@@ -29,7 +33,7 @@ def create_transfer_proposal(source_binary: str | Path, source_result: Any) -> d
     relationship = inference.get("data_flow_relationship", {})
     if (source_result.capacity_source != "inferred"
             or capacity_evidence.get("inferred") is not True
-            or relationship.get("status") != "PROVEN_SUPPORTED_PATTERN"):
+            or relationship.get("status") not in _SUPPORTED_RELATION_STATUSES):
         raise ValueError("source build lacks a supported binary-derived object-to-sink relation")
     if source_result.analysis_mode != "binary_inference":
         raise ValueError("source result is not an independent binary inference")
@@ -137,7 +141,7 @@ def evaluate_cross_build_transfer(
     if (target_result.analysis_mode != "binary_inference"
             or target_result.capacity_source != "inferred"
             or target_capacity.get("inferred") is not True
-            or target_relation.get("status") != "PROVEN_SUPPORTED_PATTERN"
+            or target_relation.get("status") not in _SUPPORTED_RELATION_STATUSES
             or not target_result.path_evidence):
         result.update(transfer_status="INCONCLUSIVE", target_evidence_validation="PASS_HASH_ONLY",
                       reason="target lacks a complete independent inference and call-path evidence")

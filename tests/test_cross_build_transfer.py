@@ -40,6 +40,19 @@ def _compile(source_name: str, output: Path, optimization: str) -> Path:
     return output
 
 
+def _compile_workspace_source(source: Path, output: Path, optimization: str) -> Path:
+    clang = _compiler()
+    assert clang is not None
+    output.parent.mkdir(parents=True, exist_ok=True)
+    command = [
+        clang, "--target=x86_64-linux-musl", f"-{optimization}", "-g",
+        "-fno-stack-protector", "-fPIC", "-shared", "-nostdlib",
+        "-fuse-ld=lld", "-Wl,-Bsymbolic", str(source), "-o", str(output),
+    ]
+    subprocess.run(command, check=True, capture_output=True, text=True, timeout=60)
+    return output
+
+
 def _analyze(binary: Path):
     return verify_unsigned_argument_at_call_inferred(
         binary, function_name="accept_sample", call_name="commit_sample"
@@ -106,3 +119,35 @@ def test_optimized_target_transfer_uses_its_own_binary_evidence(tmp_path):
     else:
         assert transfer["transfer_status"] == "INCONCLUSIVE"
         assert transfer["property_classification"] == "INCONCLUSIVE"
+
+
+@pytest.mark.parametrize("optimization", ["O1", "Os"])
+def test_cross_build_transfer_accepts_supported_optimized_target_evidence(tmp_path, optimization):
+    source = _compile_workspace_source(
+        ROOT / "fixtures" / "transfer_vulnerable.c", tmp_path / "source-o0.so", "O0")
+    target = _compile_workspace_source(
+        ROOT / "fixtures" / "transfer_patched.c", tmp_path / f"target-{optimization}.so", optimization)
+    source_result = verify_unsigned_argument_at_call_inferred(
+        source, function_name="transfer", call_name="sensitive_sink")
+    target_result = verify_unsigned_argument_at_call_inferred(
+        target, function_name="transfer", call_name="sensitive_sink")
+
+    assert source_result.status == "POTENTIAL_VIOLATION"
+    assert target_result.status == "PROPERTY_HOLDS_WITHIN_MODEL"
+    assert target_result.capacity == 16
+    assert target_result.capacity_evidence["evidence"]["data_flow_relationship"]["status"] == (
+        "PROVEN_SUPPORTED_OPTIMIZED_SCALAR_PATTERN")
+
+    proposal = create_transfer_proposal(source, source_result)
+    transfer = evaluate_cross_build_transfer(proposal, target, target_result)
+    assert transfer["transfer_status"] == "ACCEPTED"
+    assert transfer["property_classification"] == "PROPERTY_HOLDS_WITHIN_MODEL"
+    assert transfer["source_evidence_reused"] is False
+    assert transfer["target_evidence_validation"] == "PASS"
+    assert transfer["target_specific_evidence"]["all_path_hashes_match_target"] is True
+
+    optimized_source_proposal = create_transfer_proposal(target, target_result)
+    reverse = evaluate_cross_build_transfer(optimized_source_proposal, source, source_result)
+    assert reverse["transfer_status"] == "ACCEPTED"
+    assert reverse["property_classification"] == "POTENTIAL_VIOLATION"
+    assert reverse["source_evidence_reused"] is False

@@ -61,6 +61,16 @@ python scripts/run_cross_build_evaluation.py `
 
 The harness analyzes, but never executes, generated ELF files. Ground truth is separate from inference inputs. Cross-build transfer carries an abstract property and candidate names only; each target must independently establish its own object relation, call site, path evidence, and solver result. Unsupported optimized builds remain `INCONCLUSIVE`. The reported 48-build corpus is synthetic and does not establish general compiler or cross-build robustness.
 
+The optimized-VEX follow-up preserves that record and writes a separate result at `experiments/results/optimized-vex-dataflow-clang-20261022.json`. It rebuilds the original eight-case matrix at all five optimization levels and both independent fixture pairs at O0, O1, O2, and Os (56 requested build cases). It records per-build hashes, compiler commands, inference evidence, solver results, and refreshed transfer attempts. It does not execute the resulting ELF files.
+
+```powershell
+python scripts/run_cross_build_evaluation.py `
+  --work-dir work\optimized-vex-evaluation-20261022 `
+  --out experiments\results\optimized-vex-dataflow-clang-20261022.json
+```
+
+The focused regression suite exercises O1 and Os scalar recovery, O2/O3 chunk abstention, changed extents and caller guards, ambiguous/decoy/stripped/weak-guard controls, and the optimized telemetry pointer/countdown challenge. Run it with the same Clang, angr, and Z3 environment used for the original binary tests. See `docs/optimized-vex-inference.md` for accepted evidence and limitations.
+
 ## CLI
 
 ```powershell
