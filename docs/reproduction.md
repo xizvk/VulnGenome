@@ -31,7 +31,9 @@ python scripts/run_fixture_experiment.py `
   --out experiments\results\controlled-fixture-next.json
 ```
 
-The output is raw per-binary analysis and solver evidence. The recorded run at `experiments/results/controlled-fixture-clang-20261021.json` produced one satisfiable violation for the vulnerable binary and an unsatisfiable violation query for the patched binary. The explicitly annotated capacity 16 and first argument role are controlled-fixture assumptions. The result does not establish general capacity inference or real-world transfer. Use a new output filename for each run so existing evidence is not overwritten.
+The output is raw per-binary analysis and solver evidence. The recorded run at `experiments/results/controlled-fixture-clang-20261021.json` produced one satisfiable violation for the vulnerable binary and an unsatisfiable violation query for the patched binary. The explicitly annotated capacity 16 and first argument role are controlled-fixture assumptions. The result does not establish general capacity inference or real-world transfer.
+
+The separate annotation-free experiment at `experiments/results/annotation-free-invariants-clang-20261021.json` compiles the original pair and controlled variants, then calls `verify_unsigned_argument_at_call_inferred` without a capacity parameter. It records ELF/VEX capacity evidence, path constraints and branch sites, variant ground truth in a separate section, timings, commands, and hashes. Its supported case is limited to ELF object symbols directly used in a VEX store; stripped or ambiguous evidence must produce `INCONCLUSIVE`. Use a new output filename for each run so existing evidence is not overwritten.
 
 ## CLI
 

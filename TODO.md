@@ -5,7 +5,9 @@
 - [x] Record actual fixture hashes, tool versions, solver outcomes, and test counts in the experiment record and log.
 - [ ] Add expression references from angr VEX nodes to typed machine expressions.
 - [ ] Extract branch predicates and dependence slices; preserve node IDs in patch evidence.
-- [ ] Recover object capacity from binary evidence or return `INCONCLUSIVE`.
+- [x] Recover narrow ELF global-object capacity from VEX store evidence; abstain when symbol evidence is missing or ambiguous.
+- [ ] Recover local, stack, heap, and indirect object extents without relying on preserved ELF object symbols.
+- [ ] Validate the call-argument/object-extent relation against broader sink semantics and additional fixture families.
 - [ ] Expand transfer to candidate retrieval and conservative target-role mapping.
 - [ ] Add real-world samples only after authoritative provenance and independent annotation.
 - [ ] Implement LLM provider/RAG abstractions and freeze their model/configuration per experiment.

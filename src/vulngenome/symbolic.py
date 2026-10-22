@@ -1,15 +1,18 @@
 """angr symbolic tracing at a named sensitive call site.
 
-This adapter deliberately requires a controlled ABI/function annotation for
-the symbolic argument and capacity. It does not infer object capacity from a
-function name or from similarity.
+The manual API retains an explicitly labeled capacity annotation workflow. The
+inference API accepts no capacity and requires separate ELF/VEX evidence before
+it invokes the call-site solver.
 """
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
+import hashlib
 from pathlib import Path
 from typing import Any
+
+from .capacity import infer_capacity_from_binary
 
 
 @dataclass(frozen=True)
@@ -19,7 +22,7 @@ class CallSiteResult:
     function: str
     sensitive_call: str
     argument_width: int | None
-    capacity: int
+    capacity: int | None
     capacity_provenance: str
     path_constraints: tuple[str, ...]
     query_smt2: str
@@ -32,6 +35,11 @@ class CallSiteResult:
     paths_to_call: int = 0
     exploration_steps: int = 0
     exploration_complete: bool = False
+    capacity_evidence: dict[str, Any] | None = None
+    capacity_source: str = "supplied"
+    analysis_mode: str = "manual_annotation"
+    path_evidence: tuple[dict[str, Any], ...] = ()
+    invariant_evidence: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -85,6 +93,10 @@ def verify_unsigned_argument_at_call(
         return CallSiteResult("INCONCLUSIVE", digest, function_name, call_name, None, capacity,
                               capacity_provenance, (), "", "not-run", z3.get_version_string(), timeout_ms,
                               reason=f"unresolved function symbol(s): {', '.join(missing)}")
+    call_site_addresses = tuple(
+        int(call_site) for call_site in function.get_call_sites() or ()
+        if function.get_call_target(call_site) == sink.addr
+    )
     width = project.arch.bits
     if (project.arch.name != "AMD64"
             or project.loader.main_object.os not in ("linux", "UNIX - System V")):
@@ -104,11 +116,11 @@ def verify_unsigned_argument_at_call(
                               capacity_provenance, (), "", "not-run", z3.get_version_string(), timeout_ms,
                               reason="timeout_ms must be a positive integer")
 
-    captures: list[tuple[Any, Any]] = []
+    captures: list[tuple[Any, Any, tuple[int, ...]]] = []
 
     class CaptureCall(angr.SimProcedure):
         def run(self, value):  # type: ignore[no-untyped-def]
-            captures.append((self.state.copy(), value))
+            captures.append((self.state.copy(), value, _history_block_addresses(self.state)))
             return claripy.BVV(0, self.state.arch.bits)
 
     try:
@@ -158,7 +170,8 @@ def verify_unsigned_argument_at_call(
         path_terms: list[str] = []
         query_expressions: list[Any] = []
         path_strings = []
-        for index, (observed_state, observed_argument) in enumerate(captures):
+        path_evidence: list[dict[str, Any]] = []
+        for index, (observed_state, observed_argument, block_addresses) in enumerate(captures):
             if observed_argument.size() != width:
                 return CallSiteResult("INCONCLUSIVE", digest, function_name, call_name, width, capacity,
                                       capacity_provenance, tuple(path_strings), "", "not-run", z3.get_version_string(), timeout_ms,
@@ -179,6 +192,21 @@ def verify_unsigned_argument_at_call(
             query_expressions.extend(current_constraints)
             query_expressions.extend((observed_argument, violation))
             path_strings.extend(f"path_{index}: {constraint.smtlib()}" for constraint in current_constraints)
+            branch_sites = _branch_sites(project, block_addresses, set(function.block_addrs_set))
+            path_evidence.append({
+                "evidence_id": "vg-path-" + hashlib.sha256(
+                    f"{digest}:{function_name}:{index}:{','.join(hex(item) for item in block_addresses)}".encode("utf-8")
+                ).hexdigest()[:20],
+                "binary_sha256": digest,
+                "function": function_name,
+                "call": call_name,
+                "call_site_addresses": [hex(address) for address in call_site_addresses],
+                "path_index": index,
+                "path_block_addresses": [hex(address) for address in block_addresses],
+                "branch_sites": branch_sites,
+                "constraints": [constraint.smtlib() for constraint in current_constraints],
+                "sink_argument_expression": observed_argument.smtlib(),
+            })
         query = _smtlib_query(path_terms, query_expressions)
         z3_solver = z3.Solver()
         z3_solver.set(timeout=timeout_ms)
@@ -195,10 +223,11 @@ def verify_unsigned_argument_at_call(
                               exploration_complete=complete)
     version = z3.get_version_string()
     if outcome == z3.sat:
-        return CallSiteResult("POTENTIAL_VIOLATION", digest, function_name, call_name, width, capacity,
+        result = CallSiteResult("POTENTIAL_VIOLATION", digest, function_name, call_name, width, capacity,
                               capacity_provenance, tuple(path_strings), query, "sat", version, timeout_ms,
                               counterexample=model, paths_to_call=len(captures), exploration_steps=steps,
                               exploration_complete=complete)
+        return replace(result, path_evidence=tuple(path_evidence))
     if outcome == z3.unsat:
         if not complete:
             reason = f"the explored paths are UNSAT, but exploration was incomplete ({steps} steps"
@@ -214,21 +243,118 @@ def verify_unsigned_argument_at_call(
                                   reason=reason,
                                   paths_to_call=len(captures), exploration_steps=steps,
                                   exploration_complete=False)
-        return CallSiteResult("PROPERTY_HOLDS_WITHIN_MODEL", digest, function_name, call_name, width, capacity,
+        result = CallSiteResult("PROPERTY_HOLDS_WITHIN_MODEL", digest, function_name, call_name, width, capacity,
                               capacity_provenance, tuple(path_strings), query, "unsat", version, timeout_ms,
-                              reason="all explored paths to this call satisfy the supplied unsigned bound",
+                              reason=("all explored paths to this call satisfy the recorded unsigned bound; "
+                                      "this is not a complete memory-safety proof"),
                               paths_to_call=len(captures), exploration_steps=steps,
                               exploration_complete=True)
-    return CallSiteResult("INCONCLUSIVE", digest, function_name, call_name, width, capacity,
+        return replace(result, path_evidence=tuple(path_evidence))
+    result = CallSiteResult("INCONCLUSIVE", digest, function_name, call_name, width, capacity,
                           capacity_provenance, tuple(path_strings), query, "unknown", version, timeout_ms,
                           reason=unknown_reason, paths_to_call=len(captures), exploration_steps=steps,
                           exploration_complete=complete)
+    return replace(result, path_evidence=tuple(path_evidence))
+
+
+def verify_unsigned_argument_at_call_inferred(
+    binary_path: str | Path,
+    *,
+    function_name: str,
+    call_name: str,
+    argument_index: int = 0,
+    timeout_ms: int = 5000,
+    max_steps: int = 100,
+) -> CallSiteResult:
+    """Infer object capacity from binary evidence, then check the call argument.
+
+    This API deliberately has no capacity parameter and never reads fixture
+    contracts or experiment configuration. If evidence is missing or ambiguous,
+    it returns INCONCLUSIVE without invoking the solver.
+    """
+    inference = infer_capacity_from_binary(
+        binary_path, function_name=function_name, call_name=call_name
+    )
+    if inference.status != "INFERRED" or inference.capacity is None:
+        return CallSiteResult(
+            "INCONCLUSIVE", inference.binary_sha256, function_name, call_name,
+            None, None, "automatic binary inference", (), "", "not-run", None,
+            timeout_ms, reason=inference.reason or "capacity inference did not produce a value",
+            capacity_evidence=inference.to_dict(), capacity_source="unavailable",
+            analysis_mode="binary_inference",
+        )
+
+    result = verify_unsigned_argument_at_call(
+        binary_path, function_name=function_name, call_name=call_name,
+        capacity=inference.capacity,
+        capacity_provenance="inferred from ELF object extent correlated with VEX store evidence",
+        argument_index=argument_index, timeout_ms=timeout_ms, max_steps=max_steps,
+    )
+    invariant_id = "vg-inv-" + hashlib.sha256(
+        f"{inference.binary_sha256}:{function_name}:{call_name}:{inference.capacity}".encode("utf-8")
+    ).hexdigest()[:20]
+    invariant_evidence = {
+        "evidence_id": invariant_id,
+        "binary_sha256": inference.binary_sha256,
+        "kind": "sensitive_call_argument_within_object_extent",
+        "property": "unsigned_sensitive_call_argument <= inferred_object_extent",
+        "program_point": {"function": function_name,
+                           "function_address": inference.function_address,
+                           "sensitive_call": call_name,
+                           "call_address": inference.evidence.get("call_site", {}).get("address")},
+        "evidence_refs": [inference.evidence_id,
+                           *[item["evidence_id"] for item in result.path_evidence]],
+        "analysis_method": "angr symbolic execution to call site plus ELF/VEX object extent recovery",
+        "assumptions": [
+            *inference.assumptions,
+            "the first integer ABI argument is the byte count relevant to this sensitive operation",
+            "the solver result is scoped to explored paths and the recorded finite-width model",
+        ],
+        "inferred": True,
+        "supplied": False,
+    }
+    return replace(result, capacity_evidence=inference.to_dict(),
+                   capacity_source="inferred", analysis_mode="binary_inference",
+                   invariant_evidence=invariant_evidence)
 
 
 def _resolve_function(cfg: Any, name: str) -> Any | None:
     functions = cfg.kb.functions
     by_name = [function for function in functions.values() if function.name == name]
     return by_name[0] if len(by_name) == 1 else None
+
+
+def _history_block_addresses(state: Any) -> tuple[int, ...]:
+    try:
+        sequence = state.history.bbl_addrs
+        addresses = sequence.hardcopy if hasattr(sequence, "hardcopy") else sequence
+        return tuple(int(address) for address in addresses)
+    except Exception:
+        return ()
+
+
+def _branch_sites(project: Any, block_addresses: tuple[int, ...],
+                  allowed_blocks: set[int]) -> list[dict[str, Any]]:
+    sites = []
+    seen: set[int] = set()
+    for address in block_addresses:
+        if address in seen or address not in allowed_blocks:
+            continue
+        seen.add(address)
+        try:
+            block = project.factory.block(address)
+            instructions = [
+                {"address": int(item.address), "mnemonic": item.mnemonic,
+                 "op_str": item.op_str, "bytes": bytes(item.bytes).hex()}
+                for item in block.capstone.insns
+                if item.mnemonic.startswith("j") and item.mnemonic not in {"jmp", "jmpq"}
+            ]
+        except Exception:
+            continue
+        if instructions:
+            sites.append({"block_address": address, "instructions": instructions,
+                          "vex": str(block.vex)})
+    return sites
 
 
 def _smtlib_query(path_terms: list[str], expressions: list[Any]) -> str:

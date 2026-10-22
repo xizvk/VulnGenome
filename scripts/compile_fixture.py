@@ -43,35 +43,59 @@ def compiler_version() -> str:
 def compiler_metadata() -> dict[str, str]:
     command = compiler_command()
     is_clang = bool(os.environ.get("VULNGENOME_CLANG"))
-    return {
+    metadata = {
         "name": "clang" if is_clang else "zig cc",
         "executable": command[0],
         "version": compiler_version(),
     }
+    if is_clang:
+        linker = Path(command[0]).with_name("ld.lld.exe")
+        if linker.is_file():
+            result = subprocess.run([str(linker), "--version"], check=True,
+                                    capture_output=True, text=True, timeout=15)
+            metadata["linker_executable"] = str(linker.resolve())
+            metadata["linker_version"] = (result.stdout or result.stderr).strip().splitlines()[0]
+    return metadata
 
 
 def compile_pair(output_dir: Path) -> dict[str, str]:
     output_dir.mkdir(parents=True, exist_ok=True)
-    command = compiler_command()
-    use_clang = bool(os.environ.get("VULNGENOME_CLANG"))
     result: dict[str, str] = {}
     for label in ("vulnerable", "patched"):
         source = ROOT / "fixtures" / f"transfer_{label}.c"
         binary = output_dir / f"transfer_{label}.so"
-        if use_clang:
-            cmd = command + ["--target=x86_64-linux-musl", "-O0", "-g", "-fno-stack-protector",
-                             "-fPIC", "-shared", "-nostdlib", "-fuse-ld=lld", "-Wl,-Bsymbolic",
-                             str(source), "-o", str(binary)]
-        else:
-            cmd = command + ["cc", "-target", "x86_64-linux-musl", "-O0", "-g", "-fno-stack-protector",
-                             "-fPIC", "-shared", str(source), "-o", str(binary)]
-        try:
-            subprocess.run(cmd, check=True, capture_output=True, text=True)
-        except subprocess.CalledProcessError as exc:
-            detail = (exc.stderr or exc.stdout or "").strip()
-            raise RuntimeError(f"compiler command failed ({exc.returncode}): {detail}") from exc
-        result[label] = str(binary)
+        result[label] = compile_source(source, binary)
     return result
+
+
+def compile_source(source: Path, binary: Path, *, extra_flags: tuple[str, ...] = ()) -> str:
+    """Compile a controlled C input with the fixture toolchain and flags."""
+    source = source.resolve()
+    binary = binary.resolve()
+    binary.parent.mkdir(parents=True, exist_ok=True)
+    cmd = build_compile_command(source, binary, extra_flags=extra_flags)
+    try:
+        subprocess.run(cmd, check=True, capture_output=True, text=True)
+    except subprocess.CalledProcessError as exc:
+        detail = (exc.stderr or exc.stdout or "").strip()
+        raise RuntimeError(f"compiler command failed ({exc.returncode}): {detail}") from exc
+    return str(binary)
+
+
+def build_compile_command(source: Path, binary: Path, *, extra_flags: tuple[str, ...] = ()) -> list[str]:
+    """Return the exact compiler argv used for a fixture source."""
+    source = source.resolve()
+    binary = binary.resolve()
+    command = compiler_command()
+    use_clang = bool(os.environ.get("VULNGENOME_CLANG"))
+    if use_clang:
+        cmd = command + ["--target=x86_64-linux-musl", "-O0", "-g", "-fno-stack-protector",
+                         "-fPIC", "-shared", "-nostdlib", "-fuse-ld=lld", "-Wl,-Bsymbolic",
+                         *extra_flags, str(source), "-o", str(binary)]
+    else:
+        cmd = command + ["cc", "-target", "x86_64-linux-musl", "-O0", "-g", "-fno-stack-protector",
+                         "-fPIC", "-shared", *extra_flags, str(source), "-o", str(binary)]
+    return cmd
 
 
 def main() -> int:
