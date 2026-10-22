@@ -19,7 +19,6 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from compile_fixture import compiler_metadata  # noqa: E402
 from vulngenome.binary import analyze_binary, parse_metadata  # noqa: E402
-from vulngenome.capacity import infer_capacity_from_binary  # noqa: E402
 from vulngenome.patch import compare  # noqa: E402
 from vulngenome.symbolic import verify_unsigned_argument_at_call_inferred  # noqa: E402
 from vulngenome.transfer import create_transfer_proposal, evaluate_cross_build_transfer  # noqa: E402
@@ -30,6 +29,7 @@ BASE_FLAGS = [
     "-shared", "-nostdlib", "-fuse-ld=lld", "-Wl,-Bsymbolic",
 ]
 OPT_LEVELS = ("O0", "O1", "O2", "O3", "Os")
+INDEPENDENT_OPT_LEVELS = ("O0", "O1", "O2", "Os")
 MATRIX_CASES = (
     "original_vulnerable", "original_patched", "capacity_changed",
     "guard_too_large", "sink_plus_one", "unrelated_decoy",
@@ -201,18 +201,18 @@ def _build_record(case_name: str, optimization: str, case: dict[str, Any],
     result = None
     try:
         row["symbol_metadata"] = _symbol_metadata(binary, case["function"], case["sink"])
-        inference = infer_capacity_from_binary(binary, function_name=case["function"], call_name=case["sink"])
         result = verify_unsigned_argument_at_call_inferred(
             binary, function_name=case["function"], call_name=case["sink"]
         )
+        inference = result.capacity_evidence or {}
         row["independent_analysis"] = {
             "classification": result.status,
             "solver_result": result.solver_result,
             "capacity_bytes": result.capacity,
             "capacity_source": result.capacity_source,
-            "inference_status": inference.status,
-            "inference_reason": inference.reason,
-            "inference_evidence": inference.to_dict(),
+            "inference_status": inference.get("status"),
+            "inference_reason": inference.get("reason"),
+            "inference_evidence": inference,
             "binary_derived_path_constraints": list(result.path_constraints),
             "query_smt2": result.query_smt2,
             "path_evidence": list(result.path_evidence),
@@ -273,11 +273,107 @@ def _classification_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "tp": tp, "tn": tn, "fp": fp, "false_safe_fn": fn,
         "accuracy_on_classified": (tp + tn) / classified if classified else None,
         "vulnerable_precision": tp / (tp + fp) if tp + fp else None,
+        "vulnerable_precision_denominator": tp + fp,
         "vulnerable_recall_on_classified_vulnerable": tp / (tp + fn) if tp + fn else None,
+        "vulnerable_recall_on_classified_denominator": tp + fn,
         "false_safe_rate_on_classified_vulnerable": fn / (tp + fn) if tp + fn else None,
         "vulnerable_detection_rate_over_all_eligible": tp / vulnerable if vulnerable else None,
+        "vulnerable_detection_coverage_denominator": vulnerable,
         "false_safe_count": fn,
         "false_safe_rate_over_all_vulnerable": fn / vulnerable if vulnerable else None,
+    }
+
+
+def _evidence_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    supported_statuses = {
+        "PROVEN_SUPPORTED_PATTERN",
+        "PROVEN_SUPPORTED_OPTIMIZED_SCALAR_PATTERN",
+    }
+    analysis_success = sum(
+        (row.get("independent_analysis") or {}).get("classification") != "ANALYSIS_ERROR"
+        for row in rows
+    )
+    extent_count = 0
+    relation_count = 0
+    guard_count = 0
+    inconclusive_reasons: dict[str, int] = {}
+    for row in rows:
+        analysis = row.get("independent_analysis") or {}
+        inference = analysis.get("inference_evidence") or {}
+        if inference.get("status") == "INFERRED" and inference.get("capacity") is not None:
+            extent_count += 1
+        relation = (inference.get("evidence") or {}).get("data_flow_relationship") or {}
+        if relation.get("status") in supported_statuses:
+            relation_count += 1
+            has_entry = bool(relation.get("entry_guard"))
+            has_loop = bool(relation.get("back_edge_guard") or relation.get("loop_exit_guard"))
+            if has_entry and has_loop:
+                guard_count += 1
+        if analysis.get("classification") == "INCONCLUSIVE":
+            reason = analysis.get("inference_reason") or analysis.get("reason") or "unspecified"
+            inconclusive_reasons[reason] = inconclusive_reasons.get(reason, 0) + 1
+    runtimes = [float(row["analysis_runtime_seconds"]) for row in rows
+                if row.get("analysis_runtime_seconds") is not None]
+    return {
+        "build_success_count": sum((row.get("build") or {}).get("return_code") == 0 for row in rows),
+        "build_failure_count": sum((row.get("build") or {}).get("return_code") != 0 for row in rows),
+        "analysis_success_count": analysis_success,
+        "analysis_failure_count": len(rows) - analysis_success,
+        "extent_recovery_count": extent_count,
+        "supported_object_to_sink_relationship_count": relation_count,
+        "supported_guard_relationship_count": guard_count,
+        "inconclusive_reason_counts": dict(sorted(inconclusive_reasons.items())),
+        "total_analysis_runtime_seconds": round(sum(runtimes), 6),
+        "mean_analysis_runtime_seconds": round(sum(runtimes) / len(runtimes), 6) if runtimes else None,
+    }
+
+
+def _previous_matcher_diagnosis() -> dict[str, Any]:
+    """Carry forward the exact pre-change outcomes without rerunning them."""
+    previous_path = ROOT / "experiments" / "results" / "cross-build-optimization-invariants-clang-20261022.json"
+    if not previous_path.is_file():
+        return {"available": False, "reason": "prior cross-build record is missing"}
+    previous = json.loads(previous_path.read_text(encoding="utf-8"))
+    per_level: dict[str, Any] = {}
+    for level in OPT_LEVELS:
+        rows = {}
+        for case_name in ("original_vulnerable", "original_patched"):
+            row = previous["builds"].get(f"{case_name}@{level}")
+            if row is None:
+                continue
+            analysis = row.get("independent_analysis") or {}
+            inference = analysis.get("inference_evidence") or {}
+            evidence = inference.get("evidence") or {}
+            symbols = row.get("symbol_metadata", {}).get("relevant_symbols", [])
+            rows[case_name] = {
+                "binary_sha256": (row.get("artifact") or {}).get("sha256"),
+                "inference_status": analysis.get("inference_status"),
+                "exact_matcher_reason": analysis.get("inference_reason"),
+                "caller_resolved": bool(evidence.get("function", {}).get("address")),
+                "sink_resolved": bool(evidence.get("sensitive_function", {}).get("address")),
+                "direct_call_instruction": evidence.get("call_site", {}).get("instruction"),
+                "positive_size_object_symbols": [
+                    {"name": item["name"], "address": item["address"],
+                     "size_bytes": item["size_bytes"]}
+                    for item in symbols if item.get("type", "").endswith("TYPE_OBJECT")
+                    and item.get("size_bytes", 0) > 0
+                ],
+            }
+        per_level[level] = rows
+    shape = {
+        "O0": "stack frame retained; VEX exposes a stack-spilled argument, zero-based counter, unsigned counter < argument checks, and one-byte object[index] loop store",
+        "O1": "frame pointer and stack slots removed; scalar VEX loop uses a register counter, a nonzero entry check, a first object[0] store, then increment-and-equality exit",
+        "O2": "frame pointer removed; VEX represents the body as eight constant-offset byte stores per chunk, rounds the length down to a multiple of eight, then uses a separate tail loop",
+        "O3": "same recorded original vulnerable and patched binary hashes as O2; VEX uses the same unrolled chunk and tail form",
+        "Os": "frame pointer and stack slots removed; scalar VEX loop uses a register counter, a nonzero entry check, a first object[0] store, then increment-and-equality exit",
+    }
+    return {
+        "available": True,
+        "source_record": str(previous_path.resolve()),
+        "cases": per_level,
+        "matcher_precondition": "the old matcher requires _entry_frame_expression() to recover an rbp-based frame; when absent it abstains before checking optimized register-index or branch relationships",
+        "observed_vex_shapes": shape,
+        "interpretation": "The old abstention is a matcher limitation, not loss of the caller, sink, or object metadata. O1/Os preserve a scalar relation in a different representation; O2/O3 preserve the relevant state but expand it into an unsupported chunk/tail form.",
     }
 
 
@@ -393,7 +489,7 @@ def main() -> int:
     builds: dict[str, dict[str, Any]] = {}
     result_objects: dict[str, Any] = {}
     build_specs = [(name, level) for name in MATRIX_CASES for level in OPT_LEVELS]
-    build_specs.extend((name, level) for name in INDEPENDENT_CASES for level in ("O0", "O2"))
+    build_specs.extend((name, level) for name in INDEPENDENT_CASES for level in INDEPENDENT_OPT_LEVELS)
     for name, level in build_specs:
         case = CASES[name]
         key = f"{name}@{level}"
@@ -421,22 +517,26 @@ def main() -> int:
                 source_key, target_key,
             ))
     for name in INDEPENDENT_CASES:
-        source_key, target_key = f"{name}@O0", f"{name}@O2"
-        transfers.append(_transfer_attempt(
-            builds[source_key], result_objects[source_key], builds[target_key], result_objects[target_key],
-            source_key, target_key,
-        ))
+        source_key = f"{name}@O0"
+        for level in INDEPENDENT_OPT_LEVELS[1:]:
+            target_key = f"{name}@{level}"
+            transfers.append(_transfer_attempt(
+                builds[source_key], result_objects[source_key], builds[target_key], result_objects[target_key],
+                source_key, target_key,
+            ))
     for vulnerable_name, patched_name, pair_name in (
         ("frame_vulnerable", "frame_patched", "frame-staging"),
         ("telemetry_vulnerable", "telemetry_patched", "telemetry-sample"),
     ):
-        source_key, target_key = f"{vulnerable_name}@O0", f"{patched_name}@O2"
-        transfer = _transfer_attempt(
-            builds[source_key], result_objects[source_key], builds[target_key], result_objects[target_key],
-            f"{pair_name}:vulnerable@O0", f"{pair_name}:patched@O2",
-        )
-        transfer["pair_transfer"] = pair_name
-        transfers.append(transfer)
+        source_key = f"{vulnerable_name}@O0"
+        for level in INDEPENDENT_OPT_LEVELS[1:]:
+            target_key = f"{patched_name}@{level}"
+            transfer = _transfer_attempt(
+                builds[source_key], result_objects[source_key], builds[target_key], result_objects[target_key],
+                f"{pair_name}:vulnerable@O0", f"{pair_name}:patched@{level}",
+            )
+            transfer["pair_transfer"] = pair_name
+            transfers.append(transfer)
 
     stale_control: dict[str, Any] | None = None
     src_key, tgt_key = "original_vulnerable@O0", "original_patched@O2"
@@ -458,8 +558,8 @@ def main() -> int:
     pair_comparisons: dict[str, Any] = {}
     pair_specs = [
         ("original-transfer", "original_vulnerable", "original_patched", OPT_LEVELS),
-        ("frame-staging", "frame_vulnerable", "frame_patched", ("O0", "O2")),
-        ("telemetry-sample", "telemetry_vulnerable", "telemetry_patched", ("O0", "O2")),
+        ("frame-staging", "frame_vulnerable", "frame_patched", INDEPENDENT_OPT_LEVELS),
+        ("telemetry-sample", "telemetry_vulnerable", "telemetry_patched", INDEPENDENT_OPT_LEVELS),
     ]
     for pair, vulnerable_name, patched_name, levels in pair_specs:
         pair_comparisons[pair] = {}
@@ -478,6 +578,7 @@ def main() -> int:
         rows = [row for key, row in builds.items() if key.endswith(f"@{level}")]
         by_optimization[level] = {
             "built_case_count": len(rows),
+            "build_and_evidence_metrics": _evidence_metrics(rows),
             "independent_inference_metrics": _classification_metrics(rows),
             "cases": {
                 row["case"]: {
@@ -506,6 +607,7 @@ def main() -> int:
             "artifact_format": "ELF64 AMD64 shared object",
             "compiler": compiler,
             "optimization_levels": list(OPT_LEVELS),
+            "independent_fixture_optimization_levels": list(INDEPENDENT_OPT_LEVELS),
             "matrix_cases": list(MATRIX_CASES),
             "independent_fixture_cases": list(INDEPENDENT_CASES),
             "compiler_flags_except_optimization": BASE_FLAGS,
@@ -514,6 +616,7 @@ def main() -> int:
         },
         "source_level_ground_truth_policy": "ground truth is stored separately and is not passed to compilation-independent inference or transfer APIs",
         "builds": builds,
+        "previous_matcher_diagnosis": _previous_matcher_diagnosis(),
         "patch_comparisons": pair_comparisons,
         "cross_build_transfers": transfers,
         "stale_evidence_negative_control": stale_control,
@@ -525,7 +628,7 @@ def main() -> int:
             "unsat": "PROPERTY_HOLDS_WITHIN_MODEL only when target exploration is complete",
             "unknown_or_incomplete": "INCONCLUSIVE; never treated as proof of safety",
         },
-        "interpretation": "Optimization and cross-build conclusions are limited to this small synthetic Linux AMD64 ELF corpus and the recorded Clang/LLD build settings; accepted transfer always includes fresh target-specific analysis.",
+        "interpretation": "Optimization and cross-build conclusions are limited to this small synthetic Linux AMD64 ELF corpus and the recorded Clang/LLD build settings; accepted transfer always includes fresh target-specific analysis. Repeated builds of the same fixture across optimization levels are engineering regression observations, not independent vulnerability discoveries.",
         "test_results": None,
     }
     out.parent.mkdir(parents=True, exist_ok=True)
