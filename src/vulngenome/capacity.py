@@ -1,8 +1,11 @@
-"""Narrow binary-derived object-capacity recovery for Linux AMD64 ELF files.
+"""Conservative ELF object-extent inference tied to a verified sink loop.
 
-The current inference is intentionally limited to a positive-size ELF object
-symbol whose address is used by a VEX store in the named sensitive function.
-It does not consult fixture source, a manifest, or caller-supplied capacity.
+This module supports a deliberately narrow Linux AMD64 pattern. A positive
+size ELF object is accepted only when the sink function contains one byte
+store at ``object[index]`` and recovered VEX shows that ``index`` starts at
+zero, is incremented by one, and is stored only on the true edge of an
+unsigned ``index < first_argument`` loop. Unsupported or ambiguous relations
+abstain; symbol-size recovery alone is never treated as a verified capacity.
 """
 
 from __future__ import annotations
@@ -33,6 +36,7 @@ class CapacityInferenceResult:
     inferred: bool
     supplied: bool
     reason: str | None = None
+    argument_index: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -43,34 +47,43 @@ def infer_capacity_from_binary(
     *,
     function_name: str,
     call_name: str,
+    argument_index: int = 0,
 ) -> CapacityInferenceResult:
-    """Infer an object extent only when ELF and VEX evidence agree.
+    """Recover an object size only when a narrow binary data-flow pattern holds.
 
-    Supported evidence is an ELF ``STT_OBJECT`` symbol with a positive size,
-    directly referenced by the address expression of a VEX store in
-    ``call_name``. The named caller must have one direct call site to that
-    function. Everything else abstains rather than falling back to a constant.
+    The current proof pattern is an unsigned zero-based unit-stride loop whose
+    loop variable indexes a one-byte store into exactly one candidate object.
+    The loop compares that same variable with the named sink's first argument.
+    The caller and sink must resolve uniquely and have one direct call site.
     """
     path = Path(binary_path).resolve()
     data = path.read_bytes()
     metadata = parse_metadata(path, data)
     digest = metadata.sha256
-    method = "ELF STT_OBJECT extent cross-referenced to VEX Store address"
+    method = "ELF STT_OBJECT extent + VEX sink-loop argument/data-flow match"
     assumptions = (
-        "the ELF object symbol size describes the allocated object extent",
-        "the VEX store address expression references the object symbol directly",
-        "the named sensitive function and caller are uniquely resolved in this binary",
-        "this inference does not establish alias safety or generalize to indirect/dynamic allocations",
+        "the ELF STT_OBJECT symbol size describes the allocated object extent",
+        "the recognized VEX loop is the complete write pattern for this sink function",
+        "the System V AMD64 first integer argument is the sink's size_t byte count",
+        "each recognized loop iteration writes exactly one byte at its zero-based index",
+        "this matcher does not prove alias safety or support indirect/dynamic allocations",
     )
 
-    def abstain(reason: str, *, caller_addr: int | None = None,
-                sink_addr: int | None = None, evidence: dict[str, Any] | None = None) -> CapacityInferenceResult:
+    def abstain(
+        reason: str,
+        *,
+        caller_addr: int | None = None,
+        sink_addr: int | None = None,
+        evidence: dict[str, Any] | None = None,
+    ) -> CapacityInferenceResult:
         return CapacityInferenceResult(
             "INCONCLUSIVE", digest, metadata.file_format, metadata.architecture,
             function_name, caller_addr, call_name, sink_addr, None, None,
-            evidence or {}, method, assumptions, False, False, reason,
+            evidence or {}, method, assumptions, False, False, reason, argument_index,
         )
 
+    if argument_index != 0:
+        return abstain("only the first System V AMD64 integer argument is supported")
     if metadata.file_format != "ELF64" or metadata.architecture != "x86-64":
         return abstain("automatic capacity inference currently supports ELF64 x86-64 only")
 
@@ -95,96 +108,635 @@ def infer_capacity_from_binary(
                        caller_addr=caller.addr if caller else None,
                        sink_addr=sink.addr if sink else None)
 
-    call_sites = []
-    for call_site in caller.get_call_sites() or ():
-        if caller.get_call_target(call_site) == sink.addr:
-            call_sites.append(int(call_site))
-    if len(call_sites) != 1:
-        return abstain(f"expected one direct call site from {function_name} to {call_name}; found {len(call_sites)}",
+    call_blocks = [
+        int(site) for site in caller.get_call_sites() or ()
+        if caller.get_call_target(site) == sink.addr
+    ]
+    if len(call_blocks) != 1:
+        return abstain(
+            f"expected one direct call site from {function_name} to {call_name}; found {len(call_blocks)}",
+            caller_addr=int(caller.addr), sink_addr=int(sink.addr),
+        )
+    call_block_address = call_blocks[0]
+    call_instruction = _direct_call_instruction(project, call_block_address, int(sink.addr))
+    if call_instruction is None:
+        return abstain("the direct call instruction could not be uniquely recovered",
                        caller_addr=int(caller.addr), sink_addr=int(sink.addr))
-
-    object_symbols: dict[tuple[str, int, int], Any] = {}
-    for symbol in project.loader.main_object.symbols:
-        symbol_type = getattr(getattr(symbol, "type", None), "name", str(getattr(symbol, "type", "")))
-        if symbol_type.endswith("TYPE_OBJECT") and int(getattr(symbol, "size", 0) or 0) > 0:
-            key = (str(symbol.name), int(symbol.rebased_addr), int(symbol.size))
-            object_symbols[key] = symbol
-    if not object_symbols:
-        return abstain("no positive-size ELF object symbols are available; capacity cannot be inferred",
-                       caller_addr=int(caller.addr), sink_addr=int(sink.addr))
-
-    stores_by_symbol: dict[tuple[str, int, int], list[dict[str, Any]]] = {
-        key: [] for key in object_symbols
+    call_evidence = {
+        "block_address": call_block_address,
+        "instruction_address": call_instruction["address"],
+        "instruction": call_instruction,
+        "target_function": {"name": call_name, "address": int(sink.addr)},
     }
-    for block_addr in sorted(sink.block_addrs_set):
-        try:
-            block = project.factory.block(block_addr)
-        except Exception:
-            continue
-        tmp_defs = {
-            statement.tmp: statement.data
-            for statement in block.vex.statements
-            if isinstance(statement, pyvex.stmt.WrTmp)
-        }
-        current_instruction: int | None = None
-        for statement in block.vex.statements:
-            if isinstance(statement, pyvex.stmt.IMark):
-                current_instruction = int(statement.addr)
-            elif isinstance(statement, pyvex.stmt.Store):
-                constants = _resolved_constants(statement.addr, tmp_defs)
-                matched = [key for key in object_symbols if key[1] in constants]
-                if not matched:
-                    continue
-                instruction = next((item for item in block.capstone.insns
-                                    if int(item.address) == current_instruction), None)
-                item = {
-                    "block_address": int(block_addr),
-                    "instruction_address": current_instruction,
-                    "instruction": ({"address": int(instruction.address),
-                                     "mnemonic": instruction.mnemonic,
-                                     "op_str": instruction.op_str,
-                                     "bytes": bytes(instruction.bytes).hex()}
-                                    if instruction is not None else None),
-                    "store_statement": str(statement),
-                    "vex_block": str(block.vex),
-                }
-                for key in matched:
-                    stores_by_symbol[key].append(item)
-
-    referenced = {key: stores for key, stores in stores_by_symbol.items() if stores}
-    if len(referenced) != 1:
-        reason = ("no ELF object symbol is directly referenced by a VEX store in the sensitive function"
-                  if not referenced else
-                  f"multiple ELF object symbols are referenced by stores in the sensitive function: {len(referenced)}")
-        return abstain(reason, caller_addr=int(caller.addr), sink_addr=int(sink.addr))
-
-    (symbol_name, symbol_address, capacity), stores = next(iter(referenced.items()))
-    if capacity <= 0:
-        return abstain("referenced object has a non-positive symbol size",
-                       caller_addr=int(caller.addr), sink_addr=int(sink.addr))
-
-    call_site = call_sites[0]
-    call_instruction = _instruction_at(project, call_site)
-    evidence = {
+    base_evidence = {
         "binary_sha256": digest,
         "binary_format": metadata.file_format,
         "architecture": metadata.architecture,
         "function": {"name": function_name, "address": int(caller.addr)},
         "sensitive_function": {"name": call_name, "address": int(sink.addr)},
-        "call_site": {"address": call_site, "instruction": call_instruction},
+        "call_site": call_evidence,
+        "sink_argument": {"index": argument_index, "abi_register": "rdi",
+                          "width_bits": 64},
+    }
+
+    symbols_by_address: dict[int, list[tuple[str, int, int]]] = {}
+    for symbol in project.loader.main_object.symbols:
+        symbol_type = getattr(getattr(symbol, "type", None), "name", str(getattr(symbol, "type", "")))
+        size = int(getattr(symbol, "size", 0) or 0)
+        if symbol_type.endswith("TYPE_OBJECT") and size > 0:
+            item = (str(symbol.name), int(symbol.rebased_addr), size)
+            if item not in symbols_by_address.setdefault(item[1], []):
+                symbols_by_address[item[1]].append(item)
+    if not symbols_by_address:
+        return abstain("no positive-size ELF object symbols are available; capacity cannot be inferred",
+                       caller_addr=int(caller.addr), sink_addr=int(sink.addr), evidence=base_evidence)
+
+    block_info: dict[int, dict[str, Any]] = {}
+    candidate_stores: dict[tuple[str, int, int], list[dict[str, Any]]] = {}
+    all_store_records: list[dict[str, Any]] = []
+    unsupported_memory_writes: list[dict[str, Any]] = []
+    sink_calls: list[dict[str, Any]] = []
+    try:
+        for block_address in sorted(sink.block_addrs_set):
+            block = project.factory.block(block_address)
+            sink_calls.extend(
+                {"address": int(insn.address), "mnemonic": insn.mnemonic, "op_str": insn.op_str}
+                for insn in block.capstone.insns
+                if insn.mnemonic.lower().startswith("call")
+            )
+            definitions = {
+                statement.tmp: statement.data
+                for statement in block.vex.statements
+                if isinstance(statement, pyvex.stmt.WrTmp)
+            }
+            block_info[int(block_address)] = {"block": block, "definitions": definitions}
+            instruction_address: int | None = None
+            for index, statement in enumerate(block.vex.statements):
+                if isinstance(statement, pyvex.stmt.IMark):
+                    instruction_address = int(statement.addr)
+                elif _is_unsupported_memory_write(statement, pyvex):
+                    unsupported_memory_writes.append({
+                        "block_address": int(block_address),
+                        "instruction_address": instruction_address,
+                        "statement_kind": type(statement).__name__,
+                        "statement": str(statement),
+                    })
+                elif isinstance(statement, pyvex.stmt.Store):
+                    address_expr = _resolve_expr(statement.addr, definitions, block.vex.tyenv)
+                    symbol_base, offset_expr = _global_store_address(
+                        address_expr, set(symbols_by_address)
+                    )
+                    store_record = {
+                        "block_address": int(block_address),
+                        "statement_index": index,
+                        "statement": statement,
+                        "definitions": definitions,
+                        "block": block,
+                        "instruction_address": instruction_address,
+                        "address_expression": address_expr,
+                        "symbol_base": symbol_base,
+                    }
+                    all_store_records.append(store_record)
+                    if symbol_base is None:
+                        continue
+                    for symbol in symbols_by_address[symbol_base]:
+                        insn = _instruction_at(project, instruction_address) if instruction_address is not None else None
+                        candidate_stores.setdefault(symbol, []).append({
+                            **store_record,
+                            "block_address": int(block_address),
+                            "instruction": insn,
+                            "offset_expression": offset_expr,
+                            "width_bits": int(statement.data.result_size(block.vex.tyenv)),
+                            "store_statement": str(statement),
+                            "vex_block": str(block.vex),
+                        })
+    except Exception as exc:
+        return abstain(f"VEX store recovery failed: {type(exc).__name__}: {exc}",
+                       caller_addr=int(caller.addr), sink_addr=int(sink.addr), evidence=base_evidence)
+
+    if unsupported_memory_writes:
+        return abstain("unsupported VEX memory-write operations exist in the sensitive function",
+                       caller_addr=int(caller.addr), sink_addr=int(sink.addr), evidence={
+                           **base_evidence,
+                           "unsupported_memory_write_sites": unsupported_memory_writes,
+                       })
+
+    if sink_calls:
+        return abstain("calls inside the sensitive function are unsupported because their writes are not summarized",
+                       caller_addr=int(caller.addr), sink_addr=int(sink.addr), evidence={
+                           **base_evidence, "unsupported_sink_calls": sink_calls,
+                       })
+
+    if not candidate_stores:
+        return abstain("no ELF object symbol is used as a VEX store base in the sensitive function",
+                       caller_addr=int(caller.addr), sink_addr=int(sink.addr), evidence=base_evidence)
+
+    entry_info = block_info.get(int(sink.addr))
+    if entry_info is None:
+        return abstain("the sensitive function entry block could not be recovered",
+                       caller_addr=int(caller.addr), sink_addr=int(sink.addr), evidence=base_evidence)
+    entry_block = entry_info["block"]
+    entry_defs = entry_info["definitions"]
+    frame_expr = _entry_frame_expression(entry_block, entry_defs, entry_block.vex.tyenv,
+                                        project.arch.registers["rbp"][0])
+    if frame_expr is None:
+        return abstain("the supported stack-frame argument/index pattern was not recovered",
+                       caller_addr=int(caller.addr), sink_addr=int(sink.addr), evidence=base_evidence)
+
+    unclassified_stores = [
+        {"block_address": item["block_address"],
+         "instruction_address": item["instruction_address"],
+         "store_statement": str(item["statement"])}
+        for item in all_store_records
+        if item["symbol_base"] is None and not _is_stack_memory_address(
+            item["address_expression"], frame_expr,
+            int(project.arch.registers["rbp"][0]),
+            int(project.arch.registers["rsp"][0]),
+        )
+    ]
+    if unclassified_stores:
+        return abstain("unclassified non-stack stores exist in the sensitive function",
+                       caller_addr=int(caller.addr), sink_addr=int(sink.addr), evidence={
+                           **base_evidence, "unclassified_store_sites": unclassified_stores,
+                       })
+
+    argument_register = "rdi"
+    argument_offset = int(project.arch.registers[argument_register][0])
+    argument_slots: list[int] = []
+    zero_slots: set[int] = set()
+    for statement in entry_block.vex.statements:
+        if not isinstance(statement, pyvex.stmt.Store):
+            continue
+        slot = _stack_slot(statement.addr, entry_defs, entry_block.vex.tyenv,
+                           frame_expr, int(project.arch.registers["rbp"][0]))
+        if slot is None:
+            continue
+        value = _resolve_expr(statement.data, entry_defs, entry_block.vex.tyenv)
+        if value == ("get", argument_offset, 64):
+            argument_slots.append(slot)
+        if value == ("const", 0, 64):
+            zero_slots.add(slot)
+    if len(set(argument_slots)) != 1:
+        return abstain("the first sink argument is not uniquely spilled to a recovered stack slot",
+                       caller_addr=int(caller.addr), sink_addr=int(sink.addr), evidence=base_evidence)
+    argument_slot = argument_slots[0]
+
+    related: list[tuple[tuple[str, int, int], dict[str, Any]]] = []
+    rejected: list[dict[str, Any]] = []
+    for symbol, stores in candidate_stores.items():
+        if len(stores) != 1:
+            rejected.append({"object_symbol": symbol[0], "reason": "object has multiple store sites"})
+            continue
+        store = stores[0]
+        relation, relation_reason = _verify_argument_bounded_store(
+            store, block_info, entry_block, frame_expr,
+            int(project.arch.registers["rbp"][0]), argument_slot, zero_slots,
+        )
+        if relation is None:
+            rejected.append({"object_symbol": symbol[0], "reason": relation_reason})
+        else:
+            related.append((symbol, relation))
+
+    if len(related) != 1:
+        reason = ("no object store was proven to be indexed by the sink argument's supported loop"
+                  if not related else
+                  f"multiple object extents are related to the sink argument; ambiguous candidates: {len(related)}")
+        return abstain(reason, caller_addr=int(caller.addr), sink_addr=int(sink.addr), evidence={
+            **base_evidence,
+            "candidate_assessments": rejected + [
+                {"object_symbol": item[0][0], "relation": item[1]} for item in related
+            ],
+        })
+
+    (symbol_name, symbol_address, capacity), relation = related[0]
+    evidence = {
+        **base_evidence,
+        "sink_argument": {"index": argument_index, "abi_register": argument_register,
+                          "width_bits": 64, "stack_slot": relation["argument_stack_slot"]},
         "object_symbol": {"name": symbol_name, "address": symbol_address,
                           "size_bytes": capacity, "symbol_type": "STT_OBJECT"},
-        "store_evidence": stores,
-        "analysis": "CFGFast function recovery; VEX Store address resolved through same-block temporary definitions",
+        "store_evidence": [{
+            "block_address": relation["store_block_address"],
+            "instruction_address": (relation["store_instruction"]["address"]
+                                    if relation["store_instruction"] else None),
+            "instruction": relation["store_instruction"],
+            "store_statement": relation["store_address_vex"],
+            "vex_block": relation["store_vex_block"],
+            "data_width_bits": relation["store_width_bits"],
+        }],
+        "data_flow_relationship": relation,
+        "candidate_assessments": rejected,
+        "analysis": "CFGFast + VEX stack-slot, unsigned-loop, unit-stride, and byte-store pattern match",
     }
     evidence_id = "vg-cap-" + hashlib.sha256(
-        f"{digest}:{symbol_name}:{symbol_address:x}:{capacity}:{call_site:x}".encode("utf-8")
+        f"{digest}:{symbol_name}:{symbol_address:x}:{capacity}:{call_instruction['address']:x}:{argument_index}".encode("utf-8")
     ).hexdigest()[:20]
     return CapacityInferenceResult(
         "INFERRED", digest, metadata.file_format, metadata.architecture,
         function_name, int(caller.addr), call_name, int(sink.addr), capacity,
         evidence_id, evidence, method, assumptions, True, False,
+        argument_index=argument_index,
     )
+
+
+def _verify_argument_bounded_store(
+    store: dict[str, Any],
+    block_info: dict[int, dict[str, Any]],
+    entry_block: Any,
+    frame_expr: Any,
+    rbp_offset: int,
+    argument_slot: int,
+    zero_slots: set[int],
+) -> tuple[dict[str, Any] | None, str]:
+    import pyvex  # type: ignore[import-not-found]
+
+    entry_defs = block_info[int(entry_block.addr)]["definitions"]
+    if store["width_bits"] != 8:
+        return None, "candidate store is not exactly one byte wide"
+    body_address = int(store["block_address"])
+    body_block = store["block"]
+    counter_slot = _loaded_stack_slot(
+        store["offset_expression"], store["definitions"], body_block.vex.tyenv,
+        frame_expr, rbp_offset,
+    )
+    if counter_slot is None or counter_slot not in zero_slots:
+        return None, "store index is not a uniquely initialized zero-based stack counter"
+    if counter_slot == argument_slot:
+        return None, "store index aliases the sink argument stack slot"
+
+    # The counter and argument must remain stable except for the recognized
+    # counter increment. No extra write to the argument slot is supported.
+    arg_slot_writes = _stack_slot_writes(
+        block_info, argument_slot, frame_expr, rbp_offset
+    )
+    if len(arg_slot_writes) != 1:
+        return None, "sink argument stack slot is overwritten or has ambiguous definitions"
+
+    counter_writes = _stack_slot_writes(block_info, counter_slot, frame_expr, rbp_offset)
+    updates = []
+    for item in counter_writes:
+        expression = item["value"]
+        if _is_unit_increment(expression, counter_slot, item["definitions"],
+                              item["block"].vex.tyenv, frame_expr, rbp_offset):
+            updates.append(item)
+    if (len(updates) != 1 or updates[0]["block_address"] != body_address
+            or updates[0]["statement_index"] <= store["statement_index"]):
+        return None, "counter is not incremented exactly once after the object store"
+    if len(counter_writes) != 2:
+        return None, "loop counter has additional or ambiguous writes"
+    init_writes = [item for item in counter_writes
+                   if item["block_address"] == int(entry_block.addr)
+                   and item["value"] == ("const", 0, 64)]
+    if len(init_writes) != 1:
+        return None, "loop counter does not have one entry-block zero initialization"
+    if arg_slot_writes[0]["block_address"] != int(entry_block.addr):
+        return None, "sink argument is not spilled in the function entry block"
+
+    # Verify both the initial check and the loop-back check. The true edge of
+    # each check enters the store block, and the body unconditionally returns
+    # to the repeated check.
+    body_next = _resolve_expr(body_block.vex.next, store["definitions"], body_block.vex.tyenv)
+    loop_header = _const_value(body_next)
+    if loop_header is None or loop_header not in block_info:
+        return None, "store block has no recovered direct back edge to a loop check"
+    if any(isinstance(stmt, pyvex.stmt.Exit) for stmt in body_block.vex.statements):
+        return None, "conditional control flow inside the store block is unsupported"
+    branch_true = _guard_edge(entry_block, entry_defs, frame_expr, rbp_offset,
+                              counter_slot, argument_slot, body_address)
+    if branch_true is None:
+        return None, "entry block does not guard the first store with unsigned index < argument"
+    loop_info = block_info[loop_header]
+    loop_guard_edge = _guard_edge(loop_info["block"], loop_info["definitions"], frame_expr,
+                                  rbp_offset, counter_slot, argument_slot, body_address)
+    if loop_guard_edge is None:
+        return None, "loop back edge does not return to an unsigned index < argument check"
+    if (init_writes[0]["statement_index"] >= branch_true["statement_index"]
+            or arg_slot_writes[0]["statement_index"] >= branch_true["statement_index"]):
+        return None, "counter initialization and argument spill must precede the entry guard"
+    if (_can_reach_block(block_info, branch_true["false_target"], body_address)
+            or _can_reach_block(block_info, loop_guard_edge["false_target"], body_address)):
+        return None, "the false edge of a loop guard can reach the object store"
+    relation = {
+        "status": "PROVEN_SUPPORTED_PATTERN",
+        "argument_index": 0,
+        "argument_stack_slot": f"rbp{argument_slot:+#x}",
+        "counter_stack_slot": f"rbp{counter_slot:+#x}",
+        "loop_condition": "unsigned counter < sink_argument",
+        "initial_counter_value": 0,
+        "counter_step": 1,
+        "entry_argument_spill_statement": arg_slot_writes[0]["statement_index"],
+        "entry_counter_init_statement": init_writes[0]["statement_index"],
+        "store_width_bits": store["width_bits"],
+        "store_block_address": body_address,
+        "store_instruction": store["instruction"],
+        "store_address_vex": store["store_statement"],
+        "store_vex_block": store["vex_block"],
+        "entry_guard": branch_true,
+        "back_edge_target": loop_header,
+        "back_edge_guard": loop_guard_edge,
+        "claim": "for every reached loop iteration, the one-byte object offset is in [0, sink_argument)",
+    }
+    return relation, ""
+
+
+def _guard_edge(
+    block: Any,
+    definitions: dict[int, Any],
+    frame_expr: Any,
+    rbp_offset: int,
+    counter_slot: int,
+    argument_slot: int,
+    body_address: int,
+) -> dict[str, Any] | None:
+    import pyvex  # type: ignore[import-not-found]
+
+    next_expr = _resolve_expr(block.vex.next, definitions, block.vex.tyenv)
+    false_target = _const_value(next_expr)
+    if false_target is None or false_target == body_address:
+        return None
+    current_instruction: int | None = None
+    instruction_by_address = {int(insn.address): insn for insn in block.capstone.insns}
+    for statement_index, statement in enumerate(block.vex.statements):
+        if isinstance(statement, pyvex.stmt.IMark):
+            current_instruction = int(statement.addr)
+        elif isinstance(statement, pyvex.stmt.Exit):
+            condition = _resolve_expr(statement.guard, definitions, block.vex.tyenv)
+            compare = _direct_unsigned_lt(condition)
+            if compare is None:
+                continue
+            left_slot = _loaded_stack_slot(compare[0], definitions, block.vex.tyenv,
+                                           frame_expr, rbp_offset)
+            right_slot = _loaded_stack_slot(compare[1], definitions, block.vex.tyenv,
+                                            frame_expr, rbp_offset)
+            if left_slot != counter_slot or right_slot != argument_slot:
+                continue
+            true_target = _const_value(_resolve_expr(statement.dst, definitions, block.vex.tyenv))
+            if true_target != body_address:
+                continue
+            insn = instruction_by_address.get(current_instruction)
+            return {
+                "block_address": int(block.addr),
+                "statement_index": statement_index,
+                "branch_instruction": ({"address": int(insn.address), "mnemonic": insn.mnemonic,
+                                        "op_str": insn.op_str,
+                                        "bytes": bytes(insn.bytes).hex()} if insn else None),
+                "condition": str(condition),
+                "true_target": true_target,
+                "false_target": false_target,
+            }
+    return None
+
+
+def _can_reach_block(block_info: dict[int, dict[str, Any]], start: int, target: int) -> bool:
+    """Conservatively check direct VEX branch/fallthrough reachability.
+
+    An unresolved successor is treated as reachable: the inference must abstain
+    when it cannot establish that a false guard edge exits the sink function.
+    """
+    import pyvex  # type: ignore[import-not-found]
+
+    pending = [start]
+    seen: set[int] = set()
+    while pending:
+        address = pending.pop()
+        if address == target:
+            return True
+        if address in seen:
+            continue
+        if address not in block_info:
+            return True
+        seen.add(address)
+        block = block_info[address]["block"]
+        definitions = block_info[address]["definitions"]
+        next_target = _const_value(_resolve_expr(block.vex.next, definitions, block.vex.tyenv))
+        if next_target is not None:
+            pending.append(next_target)
+        elif str(getattr(block.vex, "jumpkind", "")) != "Ijk_Ret":
+            return True
+        for statement in block.vex.statements:
+            if isinstance(statement, pyvex.stmt.Exit):
+                branch_target = _const_value(_resolve_expr(statement.dst, definitions, block.vex.tyenv))
+                if branch_target is None:
+                    return True
+                pending.append(branch_target)
+    return False
+
+
+def _is_stack_memory_address(
+    expression: Any,
+    frame_expr: Any,
+    rbp_offset: int,
+    rsp_offset: int,
+) -> bool:
+    """Recognize only direct frame-pointer or stack-pointer relative addresses."""
+    normalized = _normalize_frame(expression, frame_expr, rbp_offset)
+    if normalized == ("frame",):
+        return True
+    if (isinstance(normalized, tuple) and len(normalized) >= 3
+            and normalized[0] == "get" and normalized[1] == rsp_offset):
+        return True
+    if not (isinstance(normalized, tuple) and len(normalized) == 3
+            and normalized[0] == "op"
+            and normalized[1] in {"Iop_Add64", "Iop_Sub64"}
+            and len(normalized[2]) == 2):
+        return False
+    left, right = normalized[2]
+    if (isinstance(left, tuple) and len(left) >= 3 and left[0] == "get"
+            and left[1] == rsp_offset and right and right[0] == "const"):
+        return True
+    if left == ("frame",) and right and right[0] == "const":
+        return True
+    if (normalized[1] == "Iop_Add64" and isinstance(right, tuple)
+            and len(right) >= 3 and right[0] == "get" and right[1] == rsp_offset
+            and left and left[0] == "const"):
+        return True
+    if normalized[1] == "Iop_Add64" and right == ("frame",) and left and left[0] == "const":
+        return True
+    return False
+
+
+def _is_unsupported_memory_write(statement: Any, pyvex: Any) -> bool:
+    """Reject VEX memory effects that are not ordinary, fully inspected stores."""
+    unsupported_names = {"StoreG", "CAS", "LLSC", "Dirty"}
+    statement_type = getattr(pyvex.stmt, type(statement).__name__, None)
+    return type(statement).__name__ in unsupported_names and statement_type is not None
+
+
+def _stack_slot_writes(
+    block_info: dict[int, dict[str, Any]],
+    wanted_slot: int,
+    frame_expr: Any,
+    rbp_offset: int,
+) -> list[dict[str, Any]]:
+    import pyvex  # type: ignore[import-not-found]
+
+    writes = []
+    for address, info in block_info.items():
+        block, definitions = info["block"], info["definitions"]
+        for index, statement in enumerate(block.vex.statements):
+            if not isinstance(statement, pyvex.stmt.Store):
+                continue
+            slot = _stack_slot(statement.addr, definitions, block.vex.tyenv,
+                               frame_expr, rbp_offset)
+            if slot == wanted_slot:
+                writes.append({
+                    "block_address": address,
+                    "statement_index": index,
+                    "value": _resolve_expr(statement.data, definitions, block.vex.tyenv),
+                    "definitions": definitions,
+                    "block": block,
+                })
+    return writes
+
+
+def _entry_frame_expression(block: Any, definitions: dict[int, Any], tyenv: Any,
+                             rbp_offset: int) -> Any | None:
+    import pyvex  # type: ignore[import-not-found]
+
+    for statement in block.vex.statements:
+        if isinstance(statement, pyvex.stmt.Put) and int(statement.offset) == rbp_offset:
+            return _resolve_expr(statement.data, definitions, tyenv)
+    return None
+
+
+def _stack_slot(expression: Any, definitions: dict[int, Any], tyenv: Any,
+                frame_expr: Any, rbp_offset: int) -> int | None:
+    resolved = _normalize_frame(_resolve_expr(expression, definitions, tyenv),
+                                 frame_expr, rbp_offset)
+    if not (isinstance(resolved, tuple) and len(resolved) == 3 and resolved[0] == "op"):
+        return None
+    op, children = resolved[1], resolved[2]
+    if op not in {"Iop_Add64", "Iop_Sub64"} or len(children) != 2:
+        return None
+    left, right = children
+    if left == ("frame",) and right and right[0] == "const":
+        value = _signed_const(right[1], right[2])
+        return value if op == "Iop_Add64" else -value
+    if op == "Iop_Add64" and right == ("frame",) and left and left[0] == "const":
+        return _signed_const(left[1], left[2])
+    return None
+
+
+def _loaded_stack_slot(expression: Any, definitions: dict[int, Any], tyenv: Any,
+                       frame_expr: Any, rbp_offset: int) -> int | None:
+    resolved = _resolve_expr(expression, definitions, tyenv)
+    if not (isinstance(resolved, tuple) and len(resolved) == 3 and resolved[0] == "load"):
+        return None
+    return _stack_slot(resolved[1], {}, tyenv, frame_expr, rbp_offset)
+
+
+def _is_unit_increment(expression: Any, counter_slot: int, definitions: dict[int, Any],
+                       tyenv: Any, frame_expr: Any, rbp_offset: int) -> bool:
+    if not (isinstance(expression, tuple) and len(expression) == 3 and expression[0] == "op"
+            and expression[1] == "Iop_Add64" and len(expression[2]) == 2):
+        return False
+    left, right = expression[2]
+    candidates = ((left, right), (right, left))
+    for load_expr, const_expr in candidates:
+        if not (isinstance(const_expr, tuple) and const_expr[:2] == ("const", 1)):
+            continue
+        if _loaded_stack_slot(load_expr, definitions, tyenv, frame_expr, rbp_offset) == counter_slot:
+            return True
+    return False
+
+
+def _direct_unsigned_lt(expression: Any) -> tuple[Any, Any] | None:
+    """Accept only width/boolean casts directly around an unsigned less-than.
+
+    A comparison nested in an AND/OR or another predicate is insufficient:
+    the taken edge would not necessarily imply ``index < argument``.
+    """
+    current = expression
+    while (isinstance(current, tuple) and len(current) == 3 and current[0] == "op"
+           and current[1] in {"Iop_64to1", "Iop_1Uto64"} and len(current[2]) == 1):
+        current = current[2][0]
+    if not (isinstance(current, tuple) and len(current) == 3 and current[0] == "op"
+            and current[1] == "Iop_CmpLT64U" and len(current[2]) == 2):
+        return None
+    return current[2][0], current[2][1]
+
+
+def _global_store_address(expression: Any, symbol_addresses: set[int]) -> tuple[int | None, Any]:
+    if (isinstance(expression, tuple) and len(expression) >= 2
+            and expression[0] == "const" and int(expression[1]) in symbol_addresses):
+        return int(expression[1]), ("const", 0, int(expression[2]) if len(expression) > 2 else 64)
+    if not (isinstance(expression, tuple) and len(expression) == 3 and expression[0] == "op"
+            and expression[1] == "Iop_Add64" and len(expression[2]) == 2):
+        return None, None
+    left, right = expression[2]
+    for base, offset in ((left, right), (right, left)):
+        if isinstance(base, tuple) and len(base) >= 2 and base[0] == "const" and int(base[1]) in symbol_addresses:
+            return int(base[1]), offset
+    return None, None
+
+
+def _normalize_frame(expression: Any, frame_expr: Any, rbp_offset: int) -> Any:
+    if expression == frame_expr:
+        return ("frame",)
+    if isinstance(expression, tuple):
+        if len(expression) >= 3 and expression[0] == "get" and expression[1] == rbp_offset:
+            return ("frame",)
+        return tuple(_normalize_frame(item, frame_expr, rbp_offset) for item in expression)
+    return expression
+
+
+def _resolve_expr(expression: Any, definitions: dict[int, Any], tyenv: Any,
+                  seen: frozenset[int] = frozenset()) -> Any:
+    import pyvex  # type: ignore[import-not-found]
+
+    if isinstance(expression, tuple):
+        return expression
+    if hasattr(expression, "value") and not hasattr(expression, "op"):
+        return ("const", int(expression.value), 64)
+    if isinstance(expression, pyvex.expr.RdTmp):
+        if expression.tmp in seen or expression.tmp not in definitions:
+            return ("tmp", int(expression.tmp))
+        return _resolve_expr(definitions[expression.tmp], definitions, tyenv,
+                             seen | {int(expression.tmp)})
+    if isinstance(expression, pyvex.expr.Const):
+        return ("const", int(expression.con.value), int(expression.result_size(tyenv)))
+    if isinstance(expression, pyvex.expr.Get):
+        return ("get", int(expression.offset), int(expression.result_size(tyenv)))
+    if isinstance(expression, pyvex.expr.Load):
+        return ("load", _resolve_expr(expression.addr, definitions, tyenv, seen), str(expression.ty))
+    op = getattr(expression, "op", None)
+    if op is not None:
+        children = getattr(expression, "child_expressions", ()) or ()
+        return ("op", str(op), tuple(_resolve_expr(child, definitions, tyenv, seen) for child in children))
+    return ("unknown", type(expression).__name__, str(expression))
+
+
+def _signed_const(value: int, width: int) -> int:
+    sign = 1 << (width - 1)
+    return value - (1 << width) if value & sign else value
+
+
+def _const_value(expression: Any) -> int | None:
+    if isinstance(expression, tuple) and len(expression) >= 2 and expression[0] == "const":
+        return int(expression[1])
+    return None
+
+
+def _direct_call_instruction(project: Any, block_address: int, sink_address: int) -> dict[str, Any] | None:
+    try:
+        block = project.factory.block(block_address)
+    except Exception:
+        return None
+    matches = []
+    for instruction in block.capstone.insns:
+        if not instruction.mnemonic.lower().startswith("call"):
+            continue
+        try:
+            target = int(instruction.op_str.split(",", 1)[0].strip(), 0)
+        except (TypeError, ValueError):
+            continue
+        if target == sink_address:
+            matches.append(instruction)
+    if len(matches) != 1:
+        return None
+    instruction = matches[0]
+    return {"address": int(instruction.address), "mnemonic": instruction.mnemonic,
+            "op_str": instruction.op_str, "bytes": bytes(instruction.bytes).hex()}
 
 
 def _resolve_unique(cfg: Any, name: str) -> Any | None:
@@ -192,29 +744,9 @@ def _resolve_unique(cfg: Any, name: str) -> Any | None:
     return matches[0] if len(matches) == 1 else None
 
 
-def _resolved_constants(expression: Any, tmp_defs: dict[int, Any]) -> set[int]:
-    """Collect constants from an expression while resolving same-block VEX temps."""
-    import pyvex  # type: ignore[import-not-found]
-
-    found: set[int] = set()
-    pending = [expression]
-    seen_temps: set[int] = set()
-    while pending:
-        node = pending.pop()
-        if isinstance(node, pyvex.expr.RdTmp):
-            if node.tmp not in seen_temps:
-                seen_temps.add(node.tmp)
-                definition = tmp_defs.get(node.tmp)
-                if definition is not None:
-                    pending.append(definition)
-        elif isinstance(node, pyvex.expr.Const):
-            found.add(int(node.con.value))
-        else:
-            pending.extend(getattr(node, "child_expressions", ()) or ())
-    return found
-
-
-def _instruction_at(project: Any, address: int) -> dict[str, Any] | None:
+def _instruction_at(project: Any, address: int | None) -> dict[str, Any] | None:
+    if address is None:
+        return None
     try:
         block = project.factory.block(address)
         instruction = next((item for item in block.capstone.insns if int(item.address) == address), None)

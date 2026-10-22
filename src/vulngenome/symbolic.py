@@ -94,8 +94,9 @@ def verify_unsigned_argument_at_call(
                               capacity_provenance, (), "", "not-run", z3.get_version_string(), timeout_ms,
                               reason=f"unresolved function symbol(s): {', '.join(missing)}")
     call_site_addresses = tuple(
-        int(call_site) for call_site in function.get_call_sites() or ()
+        address for call_site in function.get_call_sites() or ()
         if function.get_call_target(call_site) == sink.addr
+        for address in _direct_call_instruction_addresses(project, int(call_site), int(sink.addr))
     )
     width = project.arch.bits
     if (project.arch.name != "AMD64"
@@ -201,6 +202,8 @@ def verify_unsigned_argument_at_call(
                 "function": function_name,
                 "call": call_name,
                 "call_site_addresses": [hex(address) for address in call_site_addresses],
+                "argument_index": argument_index,
+                "argument_register": "rdi",
                 "path_index": index,
                 "path_block_addresses": [hex(address) for address in block_addresses],
                 "branch_sites": branch_sites,
@@ -273,7 +276,8 @@ def verify_unsigned_argument_at_call_inferred(
     it returns INCONCLUSIVE without invoking the solver.
     """
     inference = infer_capacity_from_binary(
-        binary_path, function_name=function_name, call_name=call_name
+        binary_path, function_name=function_name, call_name=call_name,
+        argument_index=argument_index,
     )
     if inference.status != "INFERRED" or inference.capacity is None:
         return CallSiteResult(
@@ -298,6 +302,8 @@ def verify_unsigned_argument_at_call_inferred(
         "binary_sha256": inference.binary_sha256,
         "kind": "sensitive_call_argument_within_object_extent",
         "property": "unsigned_sensitive_call_argument <= inferred_object_extent",
+        "argument_index": argument_index,
+        "argument_register": "rdi",
         "program_point": {"function": function_name,
                            "function_address": inference.function_address,
                            "sensitive_call": call_name,
@@ -331,6 +337,26 @@ def _history_block_addresses(state: Any) -> tuple[int, ...]:
         return tuple(int(address) for address in addresses)
     except Exception:
         return ()
+
+
+def _direct_call_instruction_addresses(project: Any, block_address: int,
+                                       target_address: int) -> tuple[int, ...]:
+    """Return addresses of direct call instructions, not CFG block starts."""
+    try:
+        block = project.factory.block(block_address)
+    except Exception:
+        return ()
+    matches = []
+    for instruction in block.capstone.insns:
+        if not instruction.mnemonic.lower().startswith("call"):
+            continue
+        try:
+            target = int(instruction.op_str.split(",", 1)[0].strip(), 0)
+        except (TypeError, ValueError):
+            continue
+        if target == target_address:
+            matches.append(int(instruction.address))
+    return tuple(matches)
 
 
 def _branch_sites(project: Any, block_addresses: tuple[int, ...],
