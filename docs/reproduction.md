@@ -21,7 +21,7 @@ The top-level package versions are pinned in `pyproject.toml`. The pip install m
 pytest -q
 ```
 
-The binary integration test compiles both fixtures, analyzes the compiled ELF objects with angr CFGFast/VEX, compares their symbol-supported function evidence, then queries the path to `sensitive_sink`. The original controlled run recorded 1 integration test passed and 22 tests in the full suite; after the annotation-free and independent adversarial cases were added, the latest full suite recorded **36 passed** (see `experiments/experiment_log.md`). If the configured compiler and required angr/Z3 dependencies are unavailable, binary tests may be skipped with the reported missing capability. Unit tests also exercise the typed DSL, bit-vector query construction, result policy, manifest leakage guard, and metrics.
+The binary integration test compiles both fixtures, analyzes the compiled ELF objects with angr CFGFast/VEX, compares their symbol-supported function evidence, then queries the path to `sensitive_sink`. The earlier adversarial checkpoint recorded **36 passed**; after the cross-build evaluation tests were added, the latest full suite recorded **38 passed** (see `experiments/experiment_log.md`). If the configured compiler and required angr/Z3 dependencies are unavailable, binary tests may be skipped with the reported missing capability. Unit tests also exercise the typed DSL, bit-vector query construction, result policy, manifest leakage guard, and metrics.
 
 ## Controlled experiment
 
@@ -46,6 +46,20 @@ python scripts/run_capacity_inference_evaluation.py `
 The runner refuses to overwrite an existing output record or binary in the selected work directory. It compiles sources in `fixtures/evaluation/capacity-inference/`, analyzes the Linux AMD64 ELF artifacts statically, and never executes them. Ground truth remains separate from inference input. Use a new output filename for every run.
 
 The extent matcher abstains when the sink contains unresolved writes or calls outside its supported pattern. The recorded evaluation is limited to its synthetic fixture set and Clang/LLD O0 build; it is not a real-world accuracy estimate.
+
+## Cross-optimization and cross-build evaluation
+
+The recorded evaluation is `experiments/results/cross-build-optimization-invariants-clang-20261022.json`. It builds the original controlled variants at `-O0`, `-O1`, `-O2`, `-O3`, and `-Os`, plus two independent fixture pairs at `-O0` and `-O2`. It also includes changed-capacity, oversized-guard, changed-sink-argument, decoy-object, ambiguous-object, and stripped-symbol controls. Use the exact compiler flags and outputs in the JSON record as the source of truth.
+
+Run a new copy without overwriting prior evidence:
+
+```powershell
+python scripts/run_cross_build_evaluation.py `
+  --work-dir work\cross-build-invariants-next `
+  --out experiments\results\cross-build-optimization-invariants-next.json
+```
+
+The harness analyzes, but never executes, generated ELF files. Ground truth is separate from inference inputs. Cross-build transfer carries an abstract property and candidate names only; each target must independently establish its own object relation, call site, path evidence, and solver result. Unsupported optimized builds remain `INCONCLUSIVE`. The reported 48-build corpus is synthetic and does not establish general compiler or cross-build robustness.
 
 ## CLI
 

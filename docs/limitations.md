@@ -9,5 +9,8 @@
 - There is no LLM, RAG, CVE corpus, BinKit/Juliet integration, baseline execution, ablation, cross-architecture, or cross-implementation experiment.
 - No real-world CVE sample has been verified or included. No research advantage, accuracy, or statistical improvement is claimed.
 - The independent adversarial evaluation uses a small set of synthetic fixtures and one Clang/LLD configuration. Its counts validate these cases only and do not estimate real-world accuracy, compiler robustness, or cross-architecture generalization.
+- The cross-optimization evaluation covers Clang/LLD 23.1.4 at `-O0`, `-O1`, `-O2`, `-O3`, and `-Os`, but the current VEX matcher recovered its supported stack-frame argument/index pattern only at `-O0`. The optimized builds therefore abstained; optimizer robustness is not established.
+- Cross-build transfer is an experimental, hash-bound prototype. It transfers only an abstract sink-argument-versus-object-extent property and candidate semantic names; the target must independently recover object/store/guard/call/path evidence. O0 telemetry fixtures demonstrate this narrow check in both directions. All 38 matrix transfers to a distinct optimization build were inconclusive because target evidence was unsupported. This is not evidence of general transferability.
+- Across the 48 repeated synthetic builds, the classifier made zero false-safe classifications, but it classified only 9/48 cases. That result is a property of this small corpus and must be read with its 39/48 abstentions, not as a general safety or accuracy estimate.
 - Windows WSL access was denied. Zig provides a cross-compiler, but the produced ELF is analyzed on Windows and is not run.
 - Ghidra, BinDiff, Diaphora, YARA export, and a dashboard are not implemented.
