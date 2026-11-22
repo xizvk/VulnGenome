@@ -1,0 +1,14 @@
+# Keep angr pinned to the engine release. It pins mutually compatible
+# archinfo/claripy/pyvex/z3 component versions. Do not separately force the
+# research project's currently conflicting older claripy pin here.
+angr==10.0.4
+# pycparser 3.12 currently breaks angr's bundled type parser at import time.
+pycparser==3.0
+
+# Local web application and acceptance-test dependencies.
+fastapi==0.165.0
+uvicorn[standard]==0.54.0
+python-multipart==0.0.34
+httpx==0.28.1
+pytest==9.2.0
+playwright==1.65.2
