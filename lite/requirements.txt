@@ -3,7 +3,7 @@
 # research project's currently conflicting older claripy pin here.
 angr==10.0.4
 # pycparser 3.12 currently breaks angr's bundled type parser at import time.
-pycparser==3.0
+pycparser==3.12
 
 # Local web application and acceptance-test dependencies.
 fastapi==0.165.0
