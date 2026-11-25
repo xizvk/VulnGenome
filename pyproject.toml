@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest==9.1.1"]
+dev = ["pytest==9.2.0"]
 fixture = ["ziglang==0.15.2"]
 
 [project.scripts]

@@ -37,7 +37,7 @@ pydantic==2.13.5
 pydantic_core==2.46.5
 Pygments==2.21.0
 pypcode==4.0.1
-pytest==9.1.1
+pytest==9.2.0
 pyvex==10.0.4
 pyxbe==1.0.4
 pyxdia==0.1.1
