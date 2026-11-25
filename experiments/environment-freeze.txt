@@ -4,7 +4,7 @@
 # are recorded in source-archive-hashes.txt because pip's sandboxed sdist extraction failed.
 angr==10.0.4
 angr-data==0.2.0
-archinfo==10.0.4
+archinfo==10.0.7
 annotated-types==0.8.0
 arpy==1.1.1
 bitarray==3.12.1
