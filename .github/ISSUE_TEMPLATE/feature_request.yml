@@ -1,0 +1,33 @@
+name: Feature request
+description: Propose a focused improvement to an existing VulnGenome component.
+title: "[Feature]: "
+labels: [enhancement, needs-triage]
+body:
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: What problem or research need does this address?
+    validations:
+      required: true
+  - type: input
+    id: component
+    attributes:
+      label: Affected existing component
+      description: Name the current module, app, test area, documentation, or experiment.
+    validations:
+      required: true
+  - type: textarea
+    id: approach
+    attributes:
+      label: Proposed approach
+      description: Outline a focused change that preserves the repository structure.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: List observable outcomes and relevant tests or evidence.
+    validations:
+      required: true

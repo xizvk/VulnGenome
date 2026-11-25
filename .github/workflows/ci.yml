@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "feature/**"
+      - "fix/**"
+      - "docs/**"
+      - "test/**"
+      - "refactor/**"
+      - "chore/**"
+
+permissions:
+  contents: read
+
+jobs:
+  lite-deterministic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: lite/requirements.txt
+      - name: Install Lite dependencies
+        run: python -m pip install -r lite/requirements.txt
+      - name: Install root package without resolving conflicting root pins
+        run: |
+          python -m pip install -e . --no-deps
+          python -m pip install "pydantic==2.13.5"
+      - name: Run deterministic Lite API tests
+        working-directory: lite/backend
+        run: python -m pytest -q tests/test_api.py -k "not controlled_pair"
+      - name: Run engine tests
+        env:
+          PYTHONPATH: src
+        run: python -m pytest -q tests

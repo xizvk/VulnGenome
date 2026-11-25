@@ -45,3 +45,23 @@ zig-out/
 
 # Environment-specific diagnostic dump; preserve locally, exclude from Git
 /experiments/results/environment-probe-where.json
+
+# Additional local developer and test artifacts
+.coverage
+coverage.xml
+htmlcov/
+*.log
+*.sqlite
+*.sqlite3
+*.db
+.runtime/
+lite/.runtime/
+lite/.venv/
+pyvex_ffi_parser_cache.*
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Explicit private dataset location; keep public manifests and fixtures tracked
+/datasets/private/

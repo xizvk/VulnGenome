@@ -1,0 +1,43 @@
+name: Bug report
+description: Report a reproducible VulnGenome problem without sharing sensitive data.
+title: "[Bug]: "
+labels: [bug, needs-triage]
+body:
+  - type: markdown
+    attributes:
+      value: Do not attach credentials, private binaries, customer data, or sensitive uploads. Share hashes and minimized public fixtures where possible.
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe the observed behavior and expected behavior.
+    validations:
+      required: true
+  - type: input
+    id: component
+    attributes:
+      label: Affected component
+      description: For example, engine CLI, Lite API, frontend, experiment script.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+      description: Include safe commands and a minimal public input or its SHA-256 hash. Never upload a sensitive binary.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: results
+    attributes:
+      label: Output and logs
+      description: Redact local paths, tokens, credentials, and sensitive file contents.
+      render: text
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Python version, OS, dependency environment, and compiler version if relevant.
+    validations:
+      required: true

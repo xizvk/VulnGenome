@@ -19,3 +19,23 @@ python scripts/run_fixture_experiment.py --work-dir ..\..\work\vulngenome --out 
 ```
 
 See [reproduction instructions](docs/reproduction.md) for the commands, prerequisites, experiment scope, and current limitations.
+
+**Dependency note:** the root manifest currently pins `claripy==9.3.7`, which conflicts with the version required by `angr==10.0.4`. Until those pins are reconciled, use the compatible setup in [CONTRIBUTING.md](CONTRIBUTING.md) rather than installing the root extras directly.
+
+## Repository collaboration
+
+VulnGenome keeps the engine, Lite application, tests, fixtures, datasets, experiments, scripts, and documentation in this single repository. See [CONTRIBUTING.md](CONTRIBUTING.md) for Python 3.12 setup, module locations, branch and commit conventions, testing guidance, and the pull-request checklist. Repository CI runs the engine suite and deterministic Lite intake tests from a clean checkout. Pytest may report compiler-dependent engine cases as skipped because compiler availability varies; Lite controlled-pair and browser tests need ignored local ELF artifacts and are not run by CI.
+
+### Existing project areas
+
+- `src/vulngenome/`: binary analysis, inference, verification, reporting, and CLI engine modules.
+- `lite/backend/` and `lite/frontend/`: local web application API and browser interface.
+- `tests/` and `lite/backend/tests/`: engine and Lite tests, respectively.
+- `fixtures/`: controlled C inputs, contracts, and evaluation cases.
+- `datasets/`: dataset manifests and schema.
+- `experiments/`: experiment configurations, records, and results.
+- `scripts/`: fixture and evaluation utilities.
+- `docs/`: architecture, semantics, limitations, threat model, and reproduction material.
+- `work/`: ignored local build and analysis artifacts; do not commit generated binaries from this directory.
+
+Local Lite settings are documented in [`lite/.env.example`](lite/.env.example). Keep actual credentials in an untracked local environment and never include them in issues or pull requests.
