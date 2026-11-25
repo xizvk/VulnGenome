@@ -42,7 +42,7 @@ pyvex==10.0.4
 pyxbe==1.0.4
 pyxdia==0.1.1
 rich==15.0.0
-setuptools==84.0.0
+setuptools==84.2.1
 sortedcontainers==2.4.0
 sympy==1.14.0
 tibs==2.0.2
