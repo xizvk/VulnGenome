@@ -51,5 +51,5 @@ typing-inspection==0.4.4
 uefi_firmware==1.16
 wheel==0.48.0
 z3-solver==5.1.0.0
-ziglang==0.15.2
+ziglang==0.17.1
 # tinycc==1.1 was inspected but not installed; its bundled 2013 compiler failed to start.
