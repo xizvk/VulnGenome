@@ -16,7 +16,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest==9.1.1"]
-fixture = ["ziglang==0.15.2"]
+fixture = ["ziglang==0.17.1"]
 
 [project.scripts]
 vulngenome = "vulngenome.cli:main"
